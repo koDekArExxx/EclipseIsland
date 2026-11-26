@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { sanitize, migrateLegacySettings } = require('./settings.cjs');
 const { configureAutostart } = require('./autostart.cjs');
+const { refreshLauncher } = require('./launcher-update.cjs');
 const { searchCities, getWeather } = require('./weather.cjs');
 const { MediaHub } = require('./media-hub.cjs');
 const { registerMediaShortcuts } = require('./media-shortcuts.cjs');
@@ -222,6 +223,7 @@ if(!app.requestSingleInstanceLock()){
   app.on('second-instance',(_event,argv=[])=>{if(app.isReady()&&!argv.includes('--autostart'))createDashboard();});
   app.whenReady().then(()=>{
     app.setAppUserModelId('app.eclipseisland.desktop');
+    refreshLauncher(app).catch(error=>console.error('Launcher update',error.code||error.message));
     settingsPath=path.join(app.getPath('userData'),'settings.json');
     try{settings=sanitize(JSON.parse(fs.readFileSync(settingsPath,'utf8')));}catch{
       try{settings=migrateLegacySettings(JSON.parse(fs.readFileSync(path.join(app.getPath('appData'),'island-pc','settings.json'),'utf8')));}catch{settings=sanitize();}

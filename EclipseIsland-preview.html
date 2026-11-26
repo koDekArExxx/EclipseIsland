@@ -63,8 +63,8 @@ body{color:var(--text)}.app-shell{background:var(--surface)}
 /* Clear liquid glass and matte blur are intentionally separate materials. */
 select,input{color-scheme:dark}
 .island[data-renderer=liquid]{
-  --lens-alpha:calc(.04 + var(--glass-opacity) * .30);
-  background:radial-gradient(150% 170% at var(--light-x,20%) var(--light-y,0%),#ffffff32,transparent 57%),linear-gradient(145deg,#ffffff12,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),rgba(var(--surface-rgb),var(--lens-alpha));
+  --lens-alpha:calc(.035 + var(--glass-opacity) * .08);
+  background:radial-gradient(150% 170% at 20% 0%,#ffffff24,transparent 57%),linear-gradient(145deg,#ffffff0e,transparent 45%,#ffffff04),rgba(255,255,255,var(--lens-alpha));
   border:1px solid #ffffff48;
   box-shadow:inset 0 1px 1px #ffffff65,inset 0 -1px 1px #ffffff25,inset 1px 0 0 #ffffff18,inset -1px 0 0 #05040a60,inset 0 0 18px rgba(var(--accent-rgb),calc(var(--glow-strength) * .35));
   backdrop-filter:none;-webkit-backdrop-filter:none;
@@ -211,7 +211,7 @@ html.overlay-document .island[data-renderer=frosted]{backdrop-filter:none;-webki
 :root[data-advanced-theme=true][data-theme-gradient=false] .island{--theme-gradient-end:var(--surface-rgb)}
 :root[data-advanced-theme=true] .island:not(.expanded):not(.is-activity-panel):not(.has-transfers){height:calc(56px + 2 * var(--theme-border-width))}
 :root[data-advanced-theme=true] .island.expanded{border-radius:var(--island-radius)}
-:root[data-advanced-theme=true] .island[data-renderer=liquid]{background:radial-gradient(150% 170% at var(--light-x,20%) var(--light-y,0%),#ffffff32,transparent 57%),linear-gradient(145deg,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),var(--theme-island-fill);box-shadow:inset 0 1px 1px #ffffff65,var(--theme-shadow)}
+:root[data-advanced-theme=true] .island[data-renderer=liquid]{background:radial-gradient(150% 170% at 20% 0%,#ffffff32,transparent 57%),linear-gradient(145deg,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),var(--theme-island-fill);box-shadow:inset 0 1px 1px #ffffff65,var(--theme-shadow)}
 :root[data-advanced-theme=true] .island[data-renderer=frosted]{background:linear-gradient(145deg,#ffffff12,#ffffff03),var(--theme-island-fill);box-shadow:inset 0 1px 0 #ffffff30,var(--theme-shadow)}
 :root[data-advanced-theme=true] .island :is(.island-tabs,.island-bottom,.transfer-card){border-color:var(--line)}
 :root[data-advanced-theme=true] .island :is(.island-tabs>button:not(.active):not(:hover),.today-panel [data-date],.island-weather small,.island-bottom>span:nth-child(2),.compact-right,.track-copy span,.track-progress>div,.tools-footer,.shot-info small,.launcher-entry small){color:var(--muted)}
@@ -315,11 +315,12 @@ html.dashboard-document body.browser-preview:has(.app-shell){background:transpar
 /* One alpha-composited outer edge; do not reintroduce a native pixel mask. */
 html.dashboard-document .app-shell{background-clip:padding-box;transform:translateZ(0);}
 
-/* One backdrop surface, rather than a blur per button. Keep morphing cheap under GPU load. */
+/* One backdrop surface, rather than a blur per button. The material stays unchanged while its bounds animate. */
 .overlay-mode .island :is(button,input,.choice-trigger,.launcher-search,.shot-card){backdrop-filter:none;-webkit-backdrop-filter:none}
-.overlay-mode .island.is-morphing,.overlay-mode .island.is-morphing::before,.overlay-mode .island.is-morphing::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;box-shadow:none!important}
-.overlay-mode .island.is-morphing{background-color:color-mix(in srgb,var(--surface),transparent 8%)}
 .overlay-mode .island :is(.island-expanded,.island-panel){isolation:isolate}
+
+/* Neutral clear glass does not change tint on hover or resize. */
+.island[data-renderer=liquid]:hover{border-color:#ffffff48}
 </style>
 </head>
 <body><div id="boot-loader" class="boot-loader"><div class="loader-tile"><span class="loader-logo" aria-hidden="true"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/></svg></span><strong>EclipseIsland</strong><span class="loader-caption">Ваше пространство готовится…</span><div class="loader-line"><i></i></div></div></div><div id="app"></div><div id="toast" role="status" aria-live="polite"></div><script>const paths = {
@@ -621,7 +622,7 @@ if(isOverlay){document.documentElement.classList.add('overlay-document');documen
 let seeking=false,mediaCommandSequence=0,settingsSequence=0;
 let overlayShowTimer;
 let pendingToolPanel;
-let nativeVisible=true,clockTimer,progressTimer,lastBounds='',lightFrame=0,lastLightUpdate=0;
+let nativeVisible=true,clockTimer,progressTimer,lastBounds='';
 const pendingActions=new Map();
 const nav=[['overview','grid','Обзор'],['appearance','sliders','Внешний вид'],['music','music','Музыка'],['weather','sun','Погода'],['capture','record','Запись экрана'],['launcher','rocket','Быстрый запуск'],['screenshots','camera','Скриншоты'],['transfers','folder','Операции с файлами'],['shortcuts','keyboard','Горячие клавиши']];
 const titles={launcher:['Быстрый запуск','Ваши приложения — в одном нажатии.'],screenshots:['Скриншоты','Область, экран, буфер и ваши снимки.'],overview:['Обзор','Всё важное. На поверхности.'],appearance:['Внешний вид','Ваш остров. Ваши правила.'],music:['Музыка','Любимые треки — на расстоянии касания.'],weather:['Погода','Небольшой прогноз для больших планов.'],capture:['Запись экрана','Сохраняйте моменты. Возвращайтесь к ним.'],transfers:['Операции с файлами','Все действия — прямо на островке.'],shortcuts:['Горячие клавиши','Меньше движений. Больше удобства.'],about:['Об EclipseIsland','Маленький центр вашего внимания.']};
@@ -921,7 +922,7 @@ function updateActivities(){
 
 function musicPage(){return `<div class="feature-banner"><div class="feature-icon">${icon('headphones')}</div><div><span class="eyebrow">ВАШ ЛИЧНЫЙ САУНДТРЕК</span><h2>Музыка всегда рядом.</h2><p>Переключайте треки, ставьте на паузу<br>и возвращайтесь к любимым моментам.</p></div><div class="banner-wave">${Array.from({length:17},(_,i)=>`<i style="--h:${18+Math.sin(i*.9)**2*58}px;--d:${i*.07}s"></i>`).join('')}</div></div><section class="settings-card music-detail">${musicControls(true)}</section><div class="info-box"><p><strong>Прямая связь со Spotify</strong><br><span data-direct-status></span><br><button class="text-button" data-spotify-setup>Настроить Spotify</button> <button class="text-button" data-spotify-log>Открыть журнал</button></p></div><div class="media-summary"><div class="media-note" data-media-note></div><button class="text-button" data-media-diagnostics>Скопировать диагностику</button><button class="text-button" data-media="refresh" aria-label="Обновить данные плеера">${icon('refresh')} Обновить</button></div>${sectionTitle('БЕЗ ЛИШНИХ ДВИЖЕНИЙ','Управление музыкой')}<section class="settings-card">${mediaSourceRow()}${toggleRow('showMusic','Музыка в острове','Название трека и управление воспроизведением','music')}</section><div class="info-box">${icon('info')}<p>EclipseIsland подключается к системной медиасессии Windows. Возможности зависят от плеера: некоторые приложения не передают длительность трека или не поддерживают перемотку.</p></div>`;}
 function weatherPage(){return `<div class="weather-detail" data-weather-detail></div>${sectionTitle('БЛИЖЕ К ДОМУ','Ваш город')}<section class="settings-card city-card"><label class="search-field">${icon('search')}<input id="city-search" placeholder="Начните вводить город…" autocomplete="off" aria-label="Поиск города"><span class="search-shortcut">⌕</span></label><div id="city-results" aria-live="polite"></div><div class="selected-city">${icon('pin')}<div><strong data-city-label>${esc(state.settings.city?.name||'Город ещё не выбран')}</strong><small>${esc(state.settings.city?.country||'Местоположение выбираете только вы')}</small></div><button class="icon-button" data-refresh-weather aria-label="Обновить погоду">${icon('refresh')}</button></div></section><section class="settings-card weather-toggle">${toggleRow('showWeather','Погода в острове','Температура и небо за окном — одним взглядом','sun')}</section><div class="weather-credit">Данные <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> · Обновление каждые 15 минут</div>`;}
-function shortcutsPage(){const browser=state.platform==='browser';return `<div class="feature-banner"><div class="feature-icon">${icon('keyboard')}</div><div><span class="eyebrow">ПРИВЫЧНО. МГНОВЕННО.</span><h2>Всё под рукой.</h2><p>Пара клавиш — и вы уже там,<br>где нужно.</p></div></div><section class="settings-card shortcuts-card">${[['Раскрыть или свернуть остров','Не отвлекаясь от текущего приложения',['Ctrl','Alt','Space'],state.shortcuts.expand],['Показать или скрыть остров','Освободите экран одним движением',['Ctrl','Alt','I'],state.shortcuts.visibility],['Быстрый запуск','Открыть вкладку с приложениями и папками',['Ctrl','Alt','L'],state.shortcuts.launcher],['Скриншот области','Выделить область на мониторе под курсором',['Ctrl','Alt','S'],state.shortcuts.screenshotArea],['Скриншот экрана','Сохранить монитор под курсором',['Ctrl','Alt','P'],state.shortcuts.screenshotScreen],['Предыдущий трек','Переключить музыку назад',['Ctrl','Alt','←'],state.shortcuts.mediaPrevious],['Следующий трек','Переключить музыку вперёд',['Ctrl','Alt','→'],state.shortcuts.mediaNext],['Пауза музыки','Приостановить текущий трек',['Ctrl','Alt','↓'],state.shortcuts.mediaPause],['Свернуть раскрытый остров','Когда нужное уже под рукой',['Esc'],true]].map(([title,desc,keys,ok])=>`<div class="setting-row"><span class="setting-copy"><strong>${title}</strong><small>${desc}${!ok&&!browser?' · Сочетание занято другим приложением':''}</small></span><div class="key-combo">${keys.map(k=>`<kbd>${k}</kbd>`).join('<span>+</span>')}</div></div>`).join('')}</section><div class="info-box">${icon('info')}<p>${browser?'Глобальные горячие клавиши работают в настольном приложении Windows.':'Сочетания Ctrl + Alt работают глобально. Esc сворачивает остров, когда его окно получает нажатие. Если игра перехватывает клавиши, используйте значок EclipseIsland в трее.'}</p></div><div class="gesture-card"><span class="gesture-icon">${icon('spark')}</span><h3>Можно и без клавиатуры</h3><p>Наведите курсор или нажмите на остров,<br>чтобы открыть больше возможностей.</p></div>`;}
+function shortcutsPage(){const browser=state.platform==='browser';return `<div class="feature-banner"><div class="feature-icon">${icon('keyboard')}</div><div><span class="eyebrow">ПРИВЫЧНО. МГНОВЕННО.</span><h2>Всё под рукой.</h2><p>Пара клавиш — и вы уже там,<br>где нужно.</p></div></div><section class="settings-card shortcuts-card">${[['Раскрыть или свернуть остров','Не отвлекаясь от текущего приложения',['Ctrl','Alt','Space'],state.shortcuts.expand],['Показать или скрыть остров','Освободите экран одним движением',['Ctrl','Alt','I'],state.shortcuts.visibility],['Быстрый запуск','Открыть вкладку с приложениями и папками',['Ctrl','Alt','L'],state.shortcuts.launcher],['Скриншот области','Выделить область на мониторе под курсором',['Ctrl','Alt','S'],state.shortcuts.screenshotArea],['Скриншот экрана','Сохранить монитор под курсором',['Ctrl','Alt','P'],state.shortcuts.screenshotScreen],['Предыдущий трек','Переключить музыку назад',['Ctrl','Alt','←'],state.shortcuts.mediaPrevious],['Следующий трек','Переключить музыку вперёд',['Ctrl','Alt','→'],state.shortcuts.mediaNext],['Пауза / воспроизведение','Остановить или продолжить текущий трек',['Ctrl','Alt','↓'],state.shortcuts.mediaPause],['Свернуть раскрытый остров','Когда нужное уже под рукой',['Esc'],true]].map(([title,desc,keys,ok])=>`<div class="setting-row"><span class="setting-copy"><strong>${title}</strong><small>${desc}${!ok&&!browser?' · Сочетание занято другим приложением':''}</small></span><div class="key-combo">${keys.map(k=>`<kbd>${k}</kbd>`).join('<span>+</span>')}</div></div>`).join('')}</section><div class="info-box">${icon('info')}<p>${browser?'Глобальные горячие клавиши работают в настольном приложении Windows.':'Сочетания Ctrl + Alt работают глобально. Esc сворачивает остров, когда его окно получает нажатие. Если игра перехватывает клавиши, используйте значок EclipseIsland в трее.'}</p></div><div class="gesture-card"><span class="gesture-icon">${icon('spark')}</span><h3>Можно и без клавиатуры</h3><p>Наведите курсор или нажмите на остров,<br>чтобы открыть больше возможностей.</p></div>`;}
 function aboutPage(){return `<div class="about-card"><div class="about-logo" aria-hidden="true">${icon('spark')}</div><h2>EclipseIsland<span class="version">0.5.0</span></h2><p>Чуть меньше шума.<br>Чуть больше вашего.</p><span class="tag">Windows 10 / 11</span></div><section class="settings-card">${toggleRow('enabled','Показывать остров','Всегда рядом, когда нужен','layers')}</section><div class="info-box">${icon('info')}<p>Для игр используйте оконный режим без рамки. В эксклюзивном полноэкранном режиме оверлей может быть скрыт. EclipseIsland использует обычное окно Windows и не внедряется в процессы игр.</p></div><button class="button danger" data-quit>${icon('power')} Выйти из EclipseIsland</button>`;}
 function renderShell(){
   if(isOverlay){document.body.classList.add('overlay-mode');app.innerHTML='<main class="overlay-root"><div class="island-mount"></div></main>';return;}
@@ -1026,8 +1027,7 @@ function reportBounds(){
 }
 function reportBoundsDuringTransition(){
  if(!isOverlay)return;transitionUntil=performance.now()+720;if(transitionFrame)return;
- const island=document.querySelector('.island');island?.classList.add('is-morphing');
- const frame=()=>{reportBounds();if(performance.now()<transitionUntil)transitionFrame=requestAnimationFrame(frame);else{transitionFrame=0;island?.classList.remove('is-morphing');reportBounds();}};
+ const frame=()=>{reportBounds();if(performance.now()<transitionUntil)transitionFrame=requestAnimationFrame(frame);else{transitionFrame=0;reportBounds();}};
  transitionFrame=requestAnimationFrame(frame);
 }
 
@@ -1042,14 +1042,6 @@ function observeBounds(){
   }
   reportBoundsDuringTransition();
 }
-
-app.addEventListener('pointermove',event=>{
-  if(state.settings.reducedMotion||performance.now()-lastLightUpdate<32)return;
-  const island=event.target.closest('.island[data-renderer="liquid"]');if(!island)return;
-  lastLightUpdate=performance.now();cancelAnimationFrame(lightFrame);
-  const x=event.clientX,y=event.clientY;
-  lightFrame=requestAnimationFrame(()=>{if(!island.isConnected)return;const r=island.getBoundingClientRect();island.style.setProperty('--light-x',`${Math.round((x-r.left)/r.width*100)}%`);island.style.setProperty('--light-y',`${Math.round((y-r.top)/r.height*100)}%`);});
-});
 
 app.addEventListener('click',async event=>{
   const el=event.target.closest('button');if(!el)return;
@@ -1178,7 +1170,7 @@ api.on(message=>{
 });
 setInterval(requestActivityHeartbeat,750);
 document.addEventListener('visibilitychange',()=>{if(uiVisible()){updateClocks();updateMediaDOM();}syncUITimers();});
-window.addEventListener('beforeunload',()=>{clearTimeout(clockTimer);clearTimeout(progressTimer);clearTimeout(hoverTimer);clearTimeout(leaveTimer);cancelAnimationFrame(transitionFrame);cancelAnimationFrame(lightFrame);resizeObserver?.disconnect();});
+window.addEventListener('beforeunload',()=>{clearTimeout(clockTimer);clearTimeout(progressTimer);clearTimeout(hoverTimer);clearTimeout(leaveTimer);cancelAnimationFrame(transitionFrame);resizeObserver?.disconnect();});
 
 async function boot(){try{state={...state,...await api.init()};state.settings=syncIslandAccent({...DEFAULTS,...state.settings});state.media=mergeMedia({},state.media);applyTheme(state.settings);renderShell();renderPage();if(isOverlay){renderIsland();applySettings();}if(pendingToolPanel){const pending=pendingToolPanel;pendingToolPanel=null;openToolPanel(pending);}if(state.platform==='browser'&&!isOverlay){document.body.classList.add('browser-preview');const badge=document.createElement('div');badge.className='browser-notice';badge.textContent='Предпросмотр интерфейса · Оверлей и системная музыка работают в приложении Windows';document.querySelector('.workspace').append(badge);if(state.settings.city)api.refreshWeather();}document.querySelector('#boot-loader')?.remove();if(isOverlay&&state.platform!=='browser')sound('startup');syncUITimers();}catch(error){app.innerHTML='<div class="boot-error"><h1>Не удалось открыть EclipseIsland</h1><p>Перезапустите приложение.</p></div>';document.querySelector('#boot-loader')?.remove();console.error(error);}}
 initControls({sound,preview:(key,value)=>applyTheme({...state.settings,...themePatch({[key]:value,...(key==='customAccent'?{accent:'custom'}:{})})}),cancelPreview:()=>applyTheme(state.settings)});

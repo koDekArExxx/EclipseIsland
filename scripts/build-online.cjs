@@ -13,8 +13,11 @@ try{
  const config={...pkg.build,files:[...pkg.build.files,'!electron/encoder/**/*.exe'],directories:{output:path.join(output,'app')}};
  const configPath=path.join(output,'builder.json');fs.writeFileSync(configPath,JSON.stringify(config));
  run(process.execPath,[require.resolve('electron-builder/cli.js'),'--win','dir','--x64','--publish','never','--config',configPath]);
- const appDir=path.join(output,'app/win-unpacked');fs.writeFileSync(path.join(appDir,'bundle.json'),JSON.stringify({version,platform:'win32',arch:'x64'}));
+ const appDir=path.join(output,'app/win-unpacked');
  run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'distribution/Build-Launcher.ps1'),'-Repository',repo]);
+ const launcher=path.join(output,'EclipseIsland-Setup.exe');
+ fs.copyFileSync(launcher,path.join(appDir,'EclipseIsland-Launcher.exe'));
+ fs.writeFileSync(path.join(appDir,'bundle.json'),JSON.stringify({version,platform:'win32',arch:'x64',launcher:{sha256:hash(launcher)}}));
  run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'distribution/Pack-Payload.ps1'),'-Source',appDir,'-Output',path.join(output,'EclipseIsland-app.zip')]);
  const zip=path.join(output,'EclipseIsland-app.zip'),setup=path.join(output,'EclipseIsland-Setup.exe');
  const update={schema:1,version,launcherVersion:1,url:'https://github.com/'+repo+'/releases/download/v'+version+'/EclipseIsland-app.zip',size:fs.statSync(zip).size,sha256:hash(zip),setupSize:fs.statSync(setup).size,setupSha256:hash(setup)};

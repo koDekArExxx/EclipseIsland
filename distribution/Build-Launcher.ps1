@@ -10,6 +10,6 @@ $generated=Join-Path $out 'BuildConfig.cs'
 $csc=Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
 if(-not (Test-Path $csc)){$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'}
 $exe=Join-Path $out 'EclipseIsland-Setup.exe'
-& $csc /nologo /optimize+ /target:winexe /platform:anycpu "/out:$exe" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/win32icon:$root\src\eclipse.ico" (Join-Path $PSScriptRoot 'Bootstrapper.cs') $generated
+& $csc /nologo /optimize+ /target:winexe /platform:anycpu "/out:$exe" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/win32icon:$root\src\eclipse.ico" "/win32manifest:$PSScriptRoot\Bootstrapper.manifest" (Join-Path $PSScriptRoot 'Bootstrapper.cs') $generated
 if($LASTEXITCODE -ne 0){throw 'Launcher compilation failed'}
 Write-Host "Setup size: $((Get-Item $exe).Length) bytes"

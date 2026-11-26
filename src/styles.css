@@ -56,8 +56,8 @@ body{color:var(--text)}.app-shell{background:var(--surface)}
 /* Clear liquid glass and matte blur are intentionally separate materials. */
 select,input{color-scheme:dark}
 .island[data-renderer=liquid]{
-  --lens-alpha:calc(.04 + var(--glass-opacity) * .30);
-  background:radial-gradient(150% 170% at var(--light-x,20%) var(--light-y,0%),#ffffff32,transparent 57%),linear-gradient(145deg,#ffffff12,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),rgba(var(--surface-rgb),var(--lens-alpha));
+  --lens-alpha:calc(.035 + var(--glass-opacity) * .08);
+  background:radial-gradient(150% 170% at 20% 0%,#ffffff24,transparent 57%),linear-gradient(145deg,#ffffff0e,transparent 45%,#ffffff04),rgba(255,255,255,var(--lens-alpha));
   border:1px solid #ffffff48;
   box-shadow:inset 0 1px 1px #ffffff65,inset 0 -1px 1px #ffffff25,inset 1px 0 0 #ffffff18,inset -1px 0 0 #05040a60,inset 0 0 18px rgba(var(--accent-rgb),calc(var(--glow-strength) * .35));
   backdrop-filter:none;-webkit-backdrop-filter:none;
@@ -204,7 +204,7 @@ html.overlay-document .island[data-renderer=frosted]{backdrop-filter:none;-webki
 :root[data-advanced-theme=true][data-theme-gradient=false] .island{--theme-gradient-end:var(--surface-rgb)}
 :root[data-advanced-theme=true] .island:not(.expanded):not(.is-activity-panel):not(.has-transfers){height:calc(56px + 2 * var(--theme-border-width))}
 :root[data-advanced-theme=true] .island.expanded{border-radius:var(--island-radius)}
-:root[data-advanced-theme=true] .island[data-renderer=liquid]{background:radial-gradient(150% 170% at var(--light-x,20%) var(--light-y,0%),#ffffff32,transparent 57%),linear-gradient(145deg,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),var(--theme-island-fill);box-shadow:inset 0 1px 1px #ffffff65,var(--theme-shadow)}
+:root[data-advanced-theme=true] .island[data-renderer=liquid]{background:radial-gradient(150% 170% at 20% 0%,#ffffff32,transparent 57%),linear-gradient(145deg,transparent 38%,rgba(var(--accent-rgb),calc(var(--glass-tint) * .45))),var(--theme-island-fill);box-shadow:inset 0 1px 1px #ffffff65,var(--theme-shadow)}
 :root[data-advanced-theme=true] .island[data-renderer=frosted]{background:linear-gradient(145deg,#ffffff12,#ffffff03),var(--theme-island-fill);box-shadow:inset 0 1px 0 #ffffff30,var(--theme-shadow)}
 :root[data-advanced-theme=true] .island :is(.island-tabs,.island-bottom,.transfer-card){border-color:var(--line)}
 :root[data-advanced-theme=true] .island :is(.island-tabs>button:not(.active):not(:hover),.today-panel [data-date],.island-weather small,.island-bottom>span:nth-child(2),.compact-right,.track-copy span,.track-progress>div,.tools-footer,.shot-info small,.launcher-entry small){color:var(--muted)}
@@ -308,8 +308,9 @@ html.dashboard-document body.browser-preview:has(.app-shell){background:transpar
 /* One alpha-composited outer edge; do not reintroduce a native pixel mask. */
 html.dashboard-document .app-shell{background-clip:padding-box;transform:translateZ(0);}
 
-/* One backdrop surface, rather than a blur per button. Keep morphing cheap under GPU load. */
+/* One backdrop surface, rather than a blur per button. The material stays unchanged while its bounds animate. */
 .overlay-mode .island :is(button,input,.choice-trigger,.launcher-search,.shot-card){backdrop-filter:none;-webkit-backdrop-filter:none}
-.overlay-mode .island.is-morphing,.overlay-mode .island.is-morphing::before,.overlay-mode .island.is-morphing::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;box-shadow:none!important}
-.overlay-mode .island.is-morphing{background-color:color-mix(in srgb,var(--surface),transparent 8%)}
 .overlay-mode .island :is(.island-expanded,.island-panel){isolation:isolate}
+
+/* Neutral clear glass does not change tint on hover or resize. */
+.island[data-renderer=liquid]:hover{border-color:#ffffff48}

@@ -7,7 +7,19 @@ const {exportMP4,verifyEncoder,argumentsFor}=require('../electron/mp4-export.cjs
 const binary=process.platform==='win32'?path.resolve(__dirname,'../electron/encoder/win-x64/ffmpeg.exe'):'/usr/bin/ffmpeg';
 const available=spawnSync(binary,['-version'],{windowsHide:true}).status===0;
 async function temporary(){const base=path.resolve(__dirname,'../test-results/tmp');await fs.mkdir(base,{recursive:true});return fs.mkdtemp(path.join(base,'mp4-'));}
-test('bundled MP4 encoder integrity is verified before starting capture',async()=>{assert.match(await verifyEncoder(),/ffmpeg\.exe$/);});
+test('MP4 encoder integrity is verified without downloading a runtime during unit tests',async()=>{
+ const root=await temporary(),file=path.join(root,'ffmpeg.exe');
+ const bytes=Buffer.from('encoder integrity fixture');
+ const sha256=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+ try{
+  await fs.writeFile(file,bytes);
+  await fs.writeFile(path.join(root,'build.json'),JSON.stringify({sha256}));
+  assert.equal(await verifyEncoder(file),file);
+  // Changing the binary invalidates the cached verification and must be rejected.
+  await fs.writeFile(file,Buffer.from('corrupted encoder integrity fixture'));
+  await assert.rejects(verifyEncoder(file),/повреждён/);
+ }finally{await fs.rm(root,{recursive:true,force:true});}
+});
 test('MP4 export preserves 240 FPS timestamps, resolution and audio in a real H.264/AAC file',{skip:!available},async()=>{
  const root=await temporary();
  try{

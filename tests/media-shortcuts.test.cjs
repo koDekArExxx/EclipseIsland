@@ -8,17 +8,20 @@ function fixture({blocked,command}={}){
   const controller=registerMediaShortcuts(globalShortcut,media,error=>errors.push(error));
   return {media,calls,errors,controller,press:key=>handlers.get('Control+Alt+'+key)(),update:patch=>{Object.assign(media.state,patch);controller.update(media.state);}};
 }
-test('registers previous, next and pause globally and exposes conflicts',async()=>{
+test('registers previous, next and play/pause globally and exposes conflicts',async()=>{
   const f=fixture({blocked:'Control+Alt+Down'});
   assert.deepEqual(f.controller.shortcuts,{mediaPrevious:true,mediaNext:true,mediaPause:false});
   await f.press('Left');await f.press('Right');assert.deepEqual(f.calls,['previous','next']);
 });
-test('pause never toggles paused media and ignores repeats while metadata catches up',async()=>{
+test('the same shortcut pauses and resumes; only an in-flight toggle is deduplicated',async()=>{
   let resolve;const f=fixture({command:()=>new Promise(r=>{resolve=r;})});
   const pending=f.press('Down');await f.press('Down');assert.deepEqual(f.calls,['toggle']);
-  resolve({ok:true});await pending;await f.press('Down');assert.deepEqual(f.calls,['toggle']);
-  f.update({playing:false});await f.press('Down');assert.deepEqual(f.calls,['toggle']);
-  f.update({playing:true});const resumed=f.press('Down');resolve({ok:true});await resumed;assert.deepEqual(f.calls,['toggle','toggle']);
+  resolve({ok:true});await pending;
+  f.update({playing:false});const resume=f.press('Down');resolve({ok:true});await resume;
+  assert.deepEqual(f.calls,['toggle','toggle']);
+  // A completed command must not lock out the next press while metadata is stale.
+  const again=f.press('Down');resolve({ok:true});await again;
+  assert.deepEqual(f.calls,['toggle','toggle','toggle']);
 });
 test('skips unavailable actions and allows pause retry after a rejected command',async()=>{
   const f=fixture({command:async()=>({ok:false,error:'failed'})});

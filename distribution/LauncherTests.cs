@@ -8,6 +8,11 @@ namespace EclipseIslandSetup {
   static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS "+name);}
   static void Reject(Action action,string name){try{action();}catch{Console.WriteLine("PASS "+name);return;}throw new Exception(name);}
   static void Main(){
+   var theme=SetupTheme.FromSettings(new System.Collections.Generic.Dictionary<string,object>{{"accent","blue"},{"surfaceColor","#15121f"},{"reducedMotion",true},{"loaderRenderer","frosted"}});
+   Check(theme.Accent.R==179&&theme.Accent.G==214&&theme.Accent.B==255&&theme.Surface.R==21,"launcher follows the application palette");
+   Check(theme.ReducedMotion&&theme.Renderer=="frosted","launcher follows loader and reduced-motion preferences");
+   var invalid=SetupTheme.FromSettings(new System.Collections.Generic.Dictionary<string,object>{{"surfaceColor","invalid"},{"textColor",5},{"accent","unknown"},{"reducedMotion","wrong type"}});
+   Check(invalid.Surface.R==18&&invalid.Accent.R==189&&!invalid.ReducedMotion,"malformed theme settings retain safe defaults");
    Check(Core.ParseVersion("0.9.1")>Core.ParseVersion("0.9.0"),"version ordering");Reject(()=>Core.ParseVersion("../bad"),"invalid versions rejected");
    Reject(()=>Core.ValidateUrl(new Uri("http://github.com/test/file")),"TLS required");Reject(()=>Core.ValidateUrl(new Uri("https://evil.example/test")),"foreign hosts rejected");
    string root=Path.Combine(Path.GetTempPath(),"EclipseLauncherTest-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
