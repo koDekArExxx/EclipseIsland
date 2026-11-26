@@ -1,6 +1,17 @@
 const { app, BrowserWindow, ipcMain, screen, globalShortcut, Tray, Menu, nativeImage, shell, clipboard, dialog, net, desktopCapturer, protocol, ClipboardItem } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const appIconPath=path.join(__dirname.replace('app.asar','app.asar.unpacked'),'../src/eclipse.ico');
+const identifiedWindows=new WeakSet();
+function applyAppIdentity(window){
+  if(process.platform!=='win32'||identifiedWindows.has(window))return;
+  window.setIcon?.(appIconPath);
+  const details={appId:'app.eclipseisland.desktop',appIconPath,appIconIndex:0,relaunchDisplayName:'EclipseIsland'};
+  if(process.env.ECLIPSE_LAUNCHER_PATH)details.relaunchCommand='\"'+process.env.ECLIPSE_LAUNCHER_PATH+'\"';
+  else if(app.isPackaged)details.relaunchCommand='\"'+process.execPath+'\"';
+  window.setAppDetails?.(details);identifiedWindows.add(window);
+}
+app.on('browser-window-created',(_event,window)=>applyAppIdentity(window));
 const { sanitize, migrateLegacySettings } = require('./settings.cjs');
 const { configureAutostart } = require('./autostart.cjs');
 const { refreshLauncher } = require('./launcher-update.cjs');
@@ -93,7 +104,7 @@ function startHitFallback(){
 }
 function syncView(window){if(window.isDestroyed())return;window.webContents.send('state',{type:'view-visible',value:true});window.webContents.send('state',{type:'snapshot',value:{settings,weather,media:mediaState,autostart,spotifySetup:spotifySetup?.state,capture:capture?.snapshot()||null,transfers:transferState,tools:tools?.snapshot()||null,replay:replay?.snapshot()||null,downloads:downloadsState},sequence:delivery.sent(window.webContents.id)});}
 function configureWindow(window) {
-  if(process.platform==='win32'&&process.env.ECLIPSE_LAUNCHER_PATH)window.setAppDetails?.({appId:'app.eclipseisland.desktop',relaunchCommand:'\"'+process.env.ECLIPSE_LAUNCHER_PATH+'\"',relaunchDisplayName:'EclipseIsland'});
+  applyAppIdentity(window);
   window.webContents.setWindowOpenHandler(({url}) => {if(url==='https://open-meteo.com/')shell.openExternal(url);return {action:'deny'};});
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_,__,callback)=>callback(false));
@@ -103,7 +114,7 @@ function configureWindow(window) {
 }
 function createDashboard() {
   if(dashboard && !dashboard.isDestroyed()){dashboard.show();dashboard.focus();return;}
-  dashboard=new BrowserWindow({width:1180,height:830,minWidth:940,minHeight:720,frame:false,transparent:true,resizable:false,hasShadow:false,backgroundColor:'#00000000',show:false,icon:path.join(__dirname,'../src/eclipse-logo.png'),title:'EclipseIsland — Настройки',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
+  dashboard=new BrowserWindow({width:1180,height:830,minWidth:940,minHeight:720,frame:false,transparent:true,resizable:false,hasShadow:false,backgroundColor:'#00000000',show:false,icon:process.platform==='win32'?appIconPath:path.join(__dirname,'../src/eclipse-logo.png'),title:'EclipseIsland — Настройки',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
   configureWindow(dashboard);
   clipDashboard(dashboard,settings);
   dashboard.on('resize',()=>clipDashboard(dashboard,settings));
@@ -248,7 +259,7 @@ if(!app.requestSingleInstanceLock()){
       let restored=false;return ()=>{if(restored)return;restored=true;try{if(hiddenDashboard&&!hiddenDashboard.isDestroyed())hiddenDashboard.setOpacity(1);}catch{}try{if(includeIsland){protectionOverrides--;applyOverlayProtection(overlayProtection);}}finally{resume?.();}};
     }});
     registerIPC();createOverlay();if(!launchedAtLogin)createDashboard();
-    const icon=nativeImage.createFromPath(path.join(__dirname,'../src/tray.png'));
+    const icon=process.platform==='win32'?appIconPath:nativeImage.createFromPath(path.join(__dirname,'../src/eclipse-logo.png'));
     tray=new Tray(icon);tray.setToolTip('EclipseIsland');
     tray.setContextMenu(Menu.buildFromTemplate([
       {label:'Открыть настройки',click:createDashboard},

@@ -8,7 +8,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
   const testProcess={...process,platform:'win32',env:{},argv:[process.execPath]};
   class Window extends EventEmitter{
     constructor(options){super();this.options=options;this.shows=0;this.focuses=0;this.visible=false;this.materials=[];this.shapes=[];this.messages=[];this.webContents=new EventEmitter();this.webContents.setWindowOpenHandler=()=>{};this.webContents.session={setPermissionRequestHandler:()=>{}};this.webContents.send=(_,value)=>this.messages.push(value);windows.push(this);}
-    isDestroyed(){return false;}isVisible(){return this.visible;}loadFile(file){this.file=file;}setPosition(){}getBounds(){return this.bounds||{x:0,y:0,width:this.options.width,height:this.options.height};}setBounds(bounds){this.bounds={...bounds};}setAlwaysOnTop(){}hide(){this.visible=false;this.emit('hide');}setShape(v){this.shapes.push(v);}setBackgroundMaterial(v){this.materials.push(v);}setFocusable(v){this.focusable=v;}setIgnoreMouseEvents(v){this.ignored=v;}setOpacity(v){this.opacity=v;}showInactive(){this.visible=true;this.shows++;this.emit('show');}show(){this.visible=true;this.shows++;this.emit('show');}focus(){this.focuses++;}
+    isDestroyed(){return false;}isVisible(){return this.visible;}loadFile(file){this.file=file;}setPosition(){}getBounds(){return this.bounds||{x:0,y:0,width:this.options.width,height:this.options.height};}setBounds(bounds){this.bounds={...bounds};}setAlwaysOnTop(){}hide(){this.visible=false;this.emit('hide');}setShape(v){this.shapes.push(v);}setBackgroundMaterial(v){this.materials.push(v);}setIcon(v){this.icon=v;}setAppDetails(v){this.appDetails=v;}setFocusable(v){this.focusable=v;}setIgnoreMouseEvents(v){this.ignored=v;}setOpacity(v){this.opacity=v;}showInactive(){this.visible=true;this.shows++;this.emit('show');}show(){this.visible=true;this.shows++;this.emit('show');}focus(){this.focuses++;}
   }
   class Tray extends EventEmitter{setToolTip(){}setContextMenu(){}}
   const flags=new Map([['disable-features','ExistingFeature']]);
@@ -55,6 +55,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
   const dashboard=windows.find(w=>!w.options.skipTaskbar);assert.equal(dashboard.messages.some(m=>m.type==='media'),false,'hidden settings receive no media ticks');
   dashboard.webContents.emit('dom-ready');assert.equal(dashboard.visible,true,'HTML loader is shown without waiting for media or ready-to-show');
   assert.equal(dashboard.options.webPreferences.backgroundThrottling,false);
+  assert.match(dashboard.icon,/eclipse\.ico$/);assert.equal(dashboard.appDetails.appId,'app.eclipseisland.desktop');assert.equal(dashboard.appDetails.appIconPath,dashboard.icon);
   dashboard.visible=false;dashboard.emit('minimize');
   update({available:true,active:true,trackKey:'restored-track',title:'Changed while minimized',playing:true});
   dashboard.visible=true;dashboard.emit('restore');

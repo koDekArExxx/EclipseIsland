@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Stable version, for example 0.9.1'
+        description: 'Stable version, for example 1.0.1'
         required: true
-        default: '0.9.1'
+        default: '1.0.0'
       notes:
         description: 'Release notes'
         required: false

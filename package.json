@@ -1,6 +1,6 @@
 {
   "name": "eclipse-island",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "description": "EclipseIsland — a floating island for Windows",
   "author": "EclipseIsland",
   "license": "MIT",
@@ -43,7 +43,8 @@
       "electron/process-list.ps1",
       "electron/screenshot-frame.ps1",
       "electron/transfers-restore.ps1",
-      "electron/transfers-visibility.cs"
+      "electron/transfers-visibility.cs",
+      "src/eclipse.ico"
     ],
     "directories": {
       "output": "release"

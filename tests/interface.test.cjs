@@ -191,9 +191,7 @@ test('native metadata-first packets update title and late cover for Spotify, Yan
      bridge.accept({type:'artwork',trackKey:packet.trackKey,artwork:art});assert.equal(f.document.querySelector('.album-art img'),null);
      bridge.accept({type:'artwork',trackKey:source+'-two',artwork:art});assert.equal(f.document.querySelector('.album-art img').getAttribute('src'),art);
    }
-   f.emit('media',{metadataError:'Не удалось обновить данные плеера'});assert.match(f.document.querySelector('[data-media-note]').textContent,/Не удалось обновить/);
-   let copied=false;f.w.island.mediaDiagnostics=async()=>{copied=true;return {ok:true};};
-   f.document.querySelector('[data-media-diagnostics]').click();await sleep(5);assert.equal(copied,true);
+   assert.equal(f.document.querySelector('[data-media-diagnostics]'),null);
  }finally{f.dom.window.close();}
 });
 
@@ -215,22 +213,25 @@ test('visible settings apply new tracks immediately even when Chromium reports d
  }finally{f.dom.window.close();}
 });
 
-test('Spotify setup progress, retry, restored status and actual connection are distinguished',async()=>{
-  const f=await fixture();const d=f.document;
-  try{
-    d.querySelector('.sidebar [data-nav="music"]').click();
-    f.emit('spotify-setup',{status:'installing',message:'Скачиваем Spicetify…'});
-    assert.match(d.querySelector('[data-direct-status]').textContent,/Скачиваем/);
-    assert.equal(d.querySelector('[data-spotify-setup]').disabled,true);
-    f.emit('spotify-setup',{status:'error',message:'Сбой <img src=x>'});
-    assert.equal(d.querySelector('[data-spotify-setup]').disabled,false);
-    assert.equal(d.querySelector('[data-spotify-setup]').textContent,'Повторить настройку');
-    assert.equal(d.querySelector('[data-direct-status] img'),null);
-    f.emit('snapshot',{spotifySetup:{status:'installed',message:'Ожидаем подключения…'},media:{available:true,directConnected:false}});
-    assert.match(d.querySelector('[data-direct-status]').textContent,/Ожидаем/);
-    f.emit('media',{directConnected:true});
-    assert.match(d.querySelector('[data-direct-status]').textContent,/Расширение подключено/);
-  }finally{f.dom.window.close();}
+test('technical setup panels stay hidden while player events keep updating the music UI',async()=>{
+ const f=await fixture();const d=f.document;
+ try{
+  d.querySelector('.sidebar [data-nav="music"]').click();
+  for(const status of ['installing','error','installed'])f.emit('spotify-setup',{status,message:'internal setup message'});
+  assert.equal(d.querySelector('[data-direct-status]'),null);assert.equal(d.querySelector('[data-spotify-setup]'),null);
+  assert.equal(d.querySelector('[data-spotify-log]'),null);assert.equal(d.querySelector('[data-media-diagnostics]'),null);
+  assert.doesNotMatch(d.body.textContent,/Прямая связь со Spotify|internal setup message/);
+  f.emit('media',{available:true,active:true,title:'Updated track',playing:true});
+  assert.equal(d.querySelector('[data-track-title]').textContent,'Updated track');
+  d.querySelector('.sidebar [data-nav="transfers"]').click();
+  assert.equal(d.querySelector('[data-media-diagnostics]'),null);assert.equal(d.querySelector('[data-download-list]'),null);assert.equal(d.querySelector('[data-ayu-folder-choose]'),null);
+  assert.doesNotMatch(d.body.textContent,/Что скачалось недавно|Папка загрузок AyuGram|Скопировать диагностику/);
+  d.querySelector('.sidebar [data-nav="appearance"]').click();assert.doesNotMatch(d.body.textContent,/Нажатия на остров и медиакнопки/);
+  d.querySelector('.sidebar [data-nav="about"]').click();
+  assert.equal(d.querySelector('.about-card .version').textContent,'0.1.0');assert.equal(d.querySelector('.os-label'),null);
+  const style=d.createElement('style');style.textContent=fs.readFileSync(path.join(root,'styles.css'),'utf8');d.head.append(style);
+  assert.equal(f.w.getComputedStyle(d.querySelector('.about-logo')).width,'64px');assert.equal(f.w.getComputedStyle(d.querySelector('.about-logo .icon')).width,'48px');
+ }finally{f.dom.window.close();}
 });
 
 test('track changes replace the cover, duration and seek range for every source and reset an incomplete timeline',async()=>{
