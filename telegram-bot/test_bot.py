@@ -1,7 +1,7 @@
-import tempfile,unittest
+import tempfile,unittest,sqlite3
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 import bot
 
 class BotTests(unittest.TestCase):
@@ -14,6 +14,23 @@ class BotTests(unittest.TestCase):
         user=self.c.admin if user is None else user
         message={'chat':{'id':user,'type':'private'},'from':{'id':user},'text':text or ''}
         return {'callback_query':{'id':'callback','from':{'id':user},'data':action,'message':message}} if action else {'message':message}
+    def test_store_closes_connections_and_rolls_back_errors_without_garbage_collection(self):
+        connections=[];connect=sqlite3.connect
+        def retain_connection(*args,**kwargs):
+            db=connect(*args,**kwargs);connections.append(db);return db
+        with patch.object(bot.sqlite3,'connect',side_effect=retain_connection):
+            store=bot.Store(self.c.data/'retained.sqlite')
+            store.set('committed',1);self.assertEqual(store.get('committed'),1)
+            with self.assertRaisesRegex(RuntimeError,'abort transaction'):
+                with store.connect() as db:
+                    db.execute('INSERT INTO kv VALUES(?,?)',('aborted','2'))
+                    raise RuntimeError('abort transaction')
+            self.assertIsNone(store.get('aborted'))
+        # Strong references deliberately prevent GC from hiding leaked connections on Linux.
+        self.assertGreaterEqual(len(connections),5)
+        for connection in connections:
+            with self.assertRaises(sqlite3.ProgrammingError):connection.execute('SELECT 1')
+        (self.c.data/'retained.sqlite').unlink()
     def test_membership_statuses(self):
         for status in ('creator','administrator','member'):self.assertTrue(bot.is_member({'status':status}))
         for status in ('left','kicked','restricted','unexpected'):self.assertFalse(bot.is_member({'status':status}))

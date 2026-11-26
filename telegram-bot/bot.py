@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """EclipseIsland distribution bot. Python 3.11+, standard library only."""
 import hashlib, html, io, json, logging, os, re, secrets, sqlite3, sys, threading, time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -25,7 +26,7 @@ def excerpt(value,maximum=2600):
 class ServiceError(Exception): pass
 class Config:
     def __init__(self,env=os.environ):
-        self.token=env.get('BOT_TOKEN','').strip();self.repo=env.get('GITHUB_REPO','').strip()
+        self.token=env.get('BOT_TOKEN','').strip();self.repo=(env.get('GITHUB_REPO') or '').strip() or 'koDekArExxx/EclipseIsland'
         self.github_token=env.get('GITHUB_TOKEN','').strip();self.admin=int(env.get('ADMIN_ID',str(ADMIN_DEFAULT)))
         self.channel=env.get('CHANNEL_ID','@EclipseIsland').strip();self.channel_url=env.get('CHANNEL_URL','https://t.me/EclipseIsland')
         self.ref=env.get('GITHUB_REF','main');self.workflow='release.yml';self.data=Path(env.get('DATA_DIR',str(Path(__file__).parent/'data')))
@@ -36,7 +37,15 @@ class Store:
     def __init__(self,path):
         self.path=path;path.parent.mkdir(parents=True,exist_ok=True)
         with self.connect() as db:db.executescript('''CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY,v TEXT);CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,first_seen REAL,last_seen REAL);CREATE TABLE IF NOT EXISTS wizard(id INTEGER PRIMARY KEY,stage TEXT,version TEXT,notes TEXT,nonce TEXT,expires REAL);CREATE TABLE IF NOT EXISTS jobs(version TEXT PRIMARY KEY,created REAL,status TEXT,run_url TEXT,notified INTEGER DEFAULT 0);''')
-    def connect(self):return sqlite3.connect(self.path,timeout=15)
+    @contextmanager
+    def connect(self):
+        db=sqlite3.connect(self.path,timeout=15)
+        try:
+            # sqlite3.Connection's context manager commits/rolls back but does not close.
+            with db:
+                yield db
+        finally:
+            db.close()
     def get(self,key,default=None):
         with self.connect() as db:r=db.execute('SELECT v FROM kv WHERE k=?',(key,)).fetchone();return json.loads(r[0]) if r else default
     def set(self,key,value):
