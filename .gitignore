@@ -1,0 +1,19 @@
+node_modules/
+release/
+test-results/
+*.log
+
+native/bin/
+native/obj/
+tests/native/bin/
+tests/native/obj/
+
+# Runtime binaries are rebuilt by GitHub Actions; do not upload them as source.
+electron/native/
+electron/encoder/**/*.exe
+release-online/
+.env
+**/.env
+telegram-bot/data/
+**/__pycache__/
+*.part

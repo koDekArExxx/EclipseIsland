@@ -1,0 +1,24 @@
+/* The entire compositor surface stays clear, including before the renderer boots. */
+html.overlay-document,
+html.overlay-document body.overlay-mode,
+html.overlay-document #app,
+html.overlay-document .overlay-root {
+  background: rgba(0, 0, 0, 0) !important;
+  background-image: none !important;
+  color-scheme: only light;
+}
+html.overlay-document, body.overlay-mode { width: 100%; height: 100%; overflow: hidden; }
+.overlay-mode .boot-loader { display: none !important; }
+.overlay-mode .island[data-renderer=modern] { box-shadow: inset 0 1px 0 #ffffff0c; }
+.overlay-mode .island { width: 328px; }
+.overlay-mode .island.expanded { width: 446px; }
+.overlay-mode .compact-track { max-width: 190px; }
+.overlay-mode #toast { display: none; }
+.overlay-mode .island-bottom [data-island-status] { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 215px; }
+.overlay-mode .island-bottom [data-island-status].has-message { color: var(--accent); }
+/* Animate opacity only: the native input region never follows a scaled-to-zero island. */
+.overlay-mode .island-mount{transition:opacity .18s ease;will-change:opacity}.overlay-concealed .island-mount{opacity:0!important;pointer-events:none}.overlay-showing .island-mount{animation:overlayReveal .22s ease both}@keyframes overlayReveal{from{opacity:0}to{opacity:1}}
+/* Fill the native viewport while retaining the original centered alignment. */
+.overlay-mode .overlay-root{width:100%;height:100%;padding:20px 4px 4px;justify-content:center}
+.overlay-mode .island{max-width:var(--island-max-width,592px);max-height:var(--island-max-height,736px)}
+html[data-advanced-theme=true].overlay-document .island[data-renderer=modern]{box-shadow:var(--theme-shadow)}

@@ -1,0 +1,2 @@
+const {contextBridge,ipcRenderer}=require('electron');
+contextBridge.exposeInMainWorld('recordingPreview',{onTheme:callback=>{ipcRenderer.on('preview:theme',(_,value)=>callback(value));},info:()=>ipcRenderer.invoke('capture-preview:info'),action:action=>ipcRenderer.invoke('capture-preview:action',action),onState:callback=>{const listener=(_,value)=>callback(value);ipcRenderer.on('capture-preview:state',listener);return ()=>ipcRenderer.removeListener('capture-preview:state',listener);}});

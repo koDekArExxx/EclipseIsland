@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src data:; object-src 'none'; base-uri 'none'"><title>Выделите область — EclipseIsland</title><link rel="stylesheet" href="screenshot-select.css"></head>
+<body>
+  <img id="frame" alt="">
+  <div id="shade"></div>
+  <div id="selection" hidden><i></i><i></i><i></i><i></i></div>
+  <div id="dimensions" hidden aria-hidden="true"><span id="size-value"></span><small>PX</small></div>
+  <div id="hint" role="region" aria-label="Выделение области">
+    <span class="capture-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v15h15M3 6h15v15"/></svg></span>
+    <div class="hint-copy"><span class="wordmark"><span class="brand-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/></svg></span>EclipseIsland / СКРИНШОТ</span><strong>Выделите область</strong><span class="description">Зажмите и потяните мышь · отпустите для сохранения</span></div>
+    <button id="cancel" type="button"><kbd>Esc</kbd><span>Отмена</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </div>
+  <script type="module" src="screenshot-select.js"></script>
+</body></html>

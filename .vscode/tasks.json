@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "Запустить EclipseIsland", "type": "npm", "script": "start", "problemMatcher": []},
+    {"label": "Собрать Windows EXE", "type": "npm", "script": "dist:win", "problemMatcher": []}
+  ]
+}

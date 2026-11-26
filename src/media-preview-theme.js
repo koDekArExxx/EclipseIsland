@@ -1,0 +1,6 @@
+(()=>{
+ const colors={mint:'#bcebc5',violet:'#bda2ff',blue:'#b3d6ff',peach:'#f2ccb2',rose:'#f5a1ca',amber:'#efcb7b'};
+ const safe=(v,d)=>/^#[0-9a-f]{6}$/i.test(v||'')?v:d;
+ const num=(v,d,min,max)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):d;
+ window.applyPreviewTheme=(s={})=>{const root=document.documentElement,a=safe(s.accent==='custom'?s.customAccent:colors[s.accent],'#bda2ff'),surface=safe(s.surfaceColor,'#120d1d'),text=safe(s.textColor,'#f0ebfa'),advanced=s.advancedTheme===true;const values={'accent':a,'surface':surface,'card':advanced?safe(s.cardColor,surface):`color-mix(in srgb, ${surface}, ${text} 5%)`,'text':text,'muted':advanced?safe(s.mutedColor,text):`color-mix(in srgb, ${text}, ${surface} 38%)`,'line':advanced?safe(s.lineColor,surface):`color-mix(in srgb, ${text}, ${surface} 84%)`,'button':advanced?safe(s.buttonColor,a):a,'button-text':advanced?safe(s.buttonText,surface):surface,'window-radius':(advanced?Math.max(22,num(s.cardRadius,12,4,24)+12):26)+'px','preview-radius':(advanced?num(s.cardRadius,12,4,24):12)+'px','glow':num(s.glow,15,0,50)+'%','blur':num(s.blur,24,0,48)+'px','tint':num(s.tint,15,0,60)+'%'};for(const [key,value] of Object.entries(values))root.style.setProperty('--'+key,value);root.dataset.material=['modern','liquid','frosted'].includes(s.uiRenderer)?s.uiRenderer:'modern';};
+})();
