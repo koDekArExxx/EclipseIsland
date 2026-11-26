@@ -16,7 +16,7 @@ export function createBrowserAPI(){
     emit('weather',weather);return weather;
   }
   return {
-    init:async()=>({settings,weather,media:{available:false,reason:'Системная музыка доступна в приложении Windows'},autostart:{supported:false,enabled:false},platform:'browser',version:'1.0.0',shortcuts:{expand:false,visibility:false},monitors:[],downloads:{items:[],recent:[],status:'ready'}}),
+    init:async()=>({settings,weather,media:{available:false,reason:'Системная музыка доступна в приложении Windows'},autostart:{supported:false,enabled:false},platform:'browser',version:'1.0.1',shortcuts:{expand:false,visibility:false},monitors:[],downloads:{items:[],recent:[],status:'ready'}}),
     save:async value=>{localStorage.setItem('island-settings',JSON.stringify(value));settings=value;emit('settings',settings);return settings;},
     cities:async query=>{try{const d=await json('https://geocoding-api.open-meteo.com/v1/search?'+new URLSearchParams({name:query,count:6,language:'ru',format:'json'}));return {ok:true,items:(d.results||[]).map(c=>({name:c.name,country:[c.admin1,c.country].filter(Boolean).join(', '),latitude:c.latitude,longitude:c.longitude}))};}catch{return {ok:false,error:'Нет соединения с сервисом поиска'};}},
     selectCity:async city=>{settings={...settings,city};localStorage.setItem('island-settings',JSON.stringify(settings));emit('settings',settings);return refreshWeather();},

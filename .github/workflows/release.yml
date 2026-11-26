@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Stable version, for example 1.0.1'
+        description: 'Stable version, for example 1.0.2'
         required: true
-        default: '1.0.0'
+        default: '1.0.1'
       notes:
         description: 'Release notes'
         required: false
@@ -49,11 +49,20 @@ jobs:
       - name: Test Windows launcher
         shell: pwsh
         run: ./distribution/Test-Launcher.ps1
+      - name: Save installer UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-ui-check
+          path: release-online/ui-check/*.png
+          if-no-files-found: ignore
       - name: Publish complete release atomically
         shell: pwsh
         run: |
           node -e 'const fs=require("fs"); const e=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,"utf8")); fs.writeFileSync("release-online/notes.txt",e.inputs.notes||"Обновление EclipseIsland");'
-          gh release create "v$env:RELEASE_VERSION" --draft --target "$env:GITHUB_SHA" --title "EclipseIsland $env:RELEASE_VERSION" --notes-file release-online/notes.txt
+          $releaseTitle="EclipseIsland $env:RELEASE_VERSION"
+          if ($env:RELEASE_VERSION -eq "1.0.1") { $releaseTitle+=" Fix" }
+          gh release create "v$env:RELEASE_VERSION" --draft --target "$env:GITHUB_SHA" --title "$releaseTitle" --notes-file release-online/notes.txt
           if ($LASTEXITCODE -ne 0) { throw 'Cannot create draft release' }
           gh release upload "v$env:RELEASE_VERSION" release-online/EclipseIsland-Setup.exe release-online/EclipseIsland-app.zip release-online/update-manifest.json
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed; draft remains unpublished' }

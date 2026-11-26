@@ -80,6 +80,10 @@ namespace EclipseIslandSetup {
   static Color ReadColor(object value,Color fallback){string s=value as string;if(s==null||!System.Text.RegularExpressions.Regex.IsMatch(s,"^#[a-fA-F0-9]{6}$"))return fallback;return ColorTranslator.FromHtml(s);}
  }
  public static class SetupDrawing {
+  public static void ChildBackdrop(Graphics g,Control control,SetupTheme theme){
+   var parent=control.Parent;Rectangle area=parent==null?new Rectangle(0,0,560,410):new Rectangle(-control.Left,-control.Top,Math.Max(1,parent.ClientSize.Width),Math.Max(1,parent.ClientSize.Height));
+   using(var brush=new System.Drawing.Drawing2D.LinearGradientBrush(area,SetupTheme.Mix(theme.Surface,theme.Accent,.055f),theme.Surface,45f))g.FillRectangle(brush,control.ClientRectangle);
+  }
   public static System.Drawing.Drawing2D.GraphicsPath Round(RectangleF r,float radius){var p=new System.Drawing.Drawing2D.GraphicsPath();float d=Math.Min(radius*2,Math.Min(r.Width,r.Height));p.AddArc(r.X,r.Y,d,d,180,90);p.AddArc(r.Right-d,r.Y,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.X,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
   public static void Text(Graphics g,string text,float size,Color color,RectangleF rect,bool bold=false){using(var font=new Font("Segoe UI",size,bold?FontStyle.Bold:FontStyle.Regular,GraphicsUnit.Pixel))using(var brush=new SolidBrush(color))using(var format=new StringFormat{Trimming=StringTrimming.EllipsisCharacter,FormatFlags=StringFormatFlags.LineLimit})g.DrawString(text,font,brush,rect,format);}
  }
@@ -94,7 +98,7 @@ namespace EclipseIslandSetup {
   protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;g.ScaleTransform(ClientSize.Width/560f,ClientSize.Width/560f);PaintSurface(g);}
   public void PaintSurface(Graphics g){var t=Theme;Color muted=SetupTheme.Mix(t.Surface,t.Text,.58f),line=SetupTheme.Mix(t.Surface,t.Text,.11f),accent=Failed?Color.FromArgb(255,158,172):t.Accent;
    g.Clear(t.Surface);using(var glow=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(0,0,560,410),SetupTheme.Mix(t.Surface,t.Accent,.055f),t.Surface,45f))g.FillRectangle(glow,0,0,560,410);
-   using(var outline=SetupDrawing.Round(new RectangleF(.5f,.5f,559,409),22))using(var pen=new Pen(line))g.DrawPath(pen,outline);
+   // The real DWM frame owns the outer border and rounded corners.
    using(var tile=SetupDrawing.Round(new RectangleF(28,28,48,48),15)){
     using(var fill=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(28,28,48,48),SetupTheme.Mix(t.Surface,t.Accent,.16f),SetupTheme.Mix(t.Surface,t.Accent,.04f),90f))g.FillPath(fill,tile);using(var pen=new Pen(Color.FromArgb(65,t.Accent)))g.DrawPath(pen,tile);
    }
@@ -114,29 +118,88 @@ namespace EclipseIslandSetup {
    if(!Failed)SetupDrawing.Text(g,"EclipseIsland · Windows",10,muted,new RectangleF(390,375,150,20));
   }
  }
- public sealed class SetupButton:Button {
-  readonly SetupTheme theme;readonly bool primary;bool hover;
-  public SetupButton(SetupTheme t,bool primary=false){theme=t;this.primary=primary;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;Cursor=Cursors.Hand;}
+ public sealed class SetupButton:Control,IButtonControl {
+  readonly SetupTheme theme;readonly bool primary;bool hover,pressed,isDefault;public string Glyph;
+  public SetupButton(SetupTheme t,bool primary=false){theme=t;this.primary=primary;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable|ControlStyles.StandardClick,true);BackColor=t.Surface;Cursor=Cursors.Hand;TabStop=true;AccessibleRole=AccessibleRole.PushButton;}
+  public DialogResult DialogResult{get;set;}
+  public void NotifyDefault(bool value){isDefault=value;Invalidate();}
+  public void PerformClick(){if(Enabled&&Visible){OnClick(EventArgs.Empty);var form=FindForm();if(form!=null&&DialogResult!=DialogResult.None)form.DialogResult=DialogResult;}}
+  protected override void OnPaintBackground(PaintEventArgs e){}
   protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}protected override void OnMouseLeave(EventArgs e){hover=false;Invalidate();base.OnMouseLeave(e);}
-  protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;RectangleF rect=new RectangleF(.5f,.5f,Width-1,Height-1);using(var shape=SetupDrawing.Round(rect,Math.Min(10,Height/3))){using(var brush=new SolidBrush(primary?SetupTheme.Mix(theme.Accent,theme.Text,hover?.12f:0):Color.FromArgb(hover?24:0,theme.Text)))g.FillPath(brush,shape);if(Focused)using(var pen=new Pen(theme.Accent))g.DrawPath(pen,shape);}using(var font=new Font("Segoe UI",Font.Size,primary?FontStyle.Bold:FontStyle.Regular))using(var brush=new SolidBrush(primary?theme.Surface:theme.Text))using(var format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(Text,font,brush,rect,format);}
+  protected override void OnMouseDown(MouseEventArgs e){if(e.Button==MouseButtons.Left){Focus();pressed=true;Invalidate();}base.OnMouseDown(e);}protected override void OnMouseUp(MouseEventArgs e){pressed=false;Invalidate();base.OnMouseUp(e);}
+  protected override void OnLostFocus(EventArgs e){pressed=false;Invalidate();base.OnLostFocus(e);}protected override void OnGotFocus(EventArgs e){Invalidate();base.OnGotFocus(e);}
+  protected override void OnEnabledChanged(EventArgs e){pressed=false;Invalidate();base.OnEnabledChanged(e);}
+  protected override bool IsInputKey(Keys key){return key==Keys.Space||key==Keys.Enter||base.IsInputKey(key);}
+  protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Space){pressed=true;Invalidate();e.Handled=true;e.SuppressKeyPress=true;}else if(e.KeyCode==Keys.Enter){PerformClick();e.Handled=true;e.SuppressKeyPress=true;}base.OnKeyDown(e);}
+  protected override void OnKeyUp(KeyEventArgs e){if(e.KeyCode==Keys.Space){bool click=pressed;pressed=false;Invalidate();if(click)PerformClick();e.Handled=true;e.SuppressKeyPress=true;}base.OnKeyUp(e);}
+  protected override AccessibleObject CreateAccessibilityInstance(){return new ButtonAccessibility(this);}
+  sealed class ButtonAccessibility:ControlAccessibleObject{readonly SetupButton button;public ButtonAccessibility(SetupButton button):base(button){this.button=button;}public override string DefaultAction{get{return "Нажать";}}public override void DoDefaultAction(){button.PerformClick();}}
+  protected override void OnPaint(PaintEventArgs e){PaintButton(e.Graphics,hover,pressed);}
+  public void PaintButton(Graphics g,bool hot,bool down){
+   SetupDrawing.ChildBackdrop(g,this,theme);g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+   float scale=Height/(primary?32f:28f);RectangleF rect=new RectangleF(.75f,.75f,Width-1.5f,Height-1.5f);
+   using(var shape=SetupDrawing.Round(rect,Math.Min(10*scale,Height/3f))){Color fill=primary?SetupTheme.Mix(theme.Accent,theme.Text,down?.20f:hot?.10f:0):Color.FromArgb(down?40:hot?22:0,theme.Text);using(var brush=new SolidBrush(fill))g.FillPath(brush,shape);if(Focused||isDefault)using(var pen=new Pen(Color.FromArgb(Focused?150:60,theme.Accent),Math.Max(1,scale)))g.DrawPath(pen,shape);}
+   Color ink=Enabled?(primary?theme.Surface:theme.Text):SetupTheme.Mix(theme.Surface,theme.Text,.35f);
+   if(Glyph=="close"||Glyph=="minimize"){
+    float cx=Width/2f,cy=Height/2f,r=4*scale;using(var pen=new Pen(ink,Math.Max(1.4f,1.4f*scale))){pen.StartCap=pen.EndCap=System.Drawing.Drawing2D.LineCap.Round;if(Glyph=="close"){g.DrawLine(pen,cx-r,cy-r,cx+r,cy+r);g.DrawLine(pen,cx+r,cy-r,cx-r,cy+r);}else g.DrawLine(pen,cx-r,cy+1*scale,cx+r,cy+1*scale);}
+   }else using(var font=new Font("Segoe UI",Font.Size,primary?FontStyle.Bold:FontStyle.Regular))using(var brush=new SolidBrush(ink))using(var format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(Text,font,brush,rect,format);
+  }
  }
- public sealed class SetupCheck:CheckBox {
-  readonly SetupTheme theme;public SetupCheck(SetupTheme t){theme=t;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;Cursor=Cursors.Hand;}
-  protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;float s=Height/26f;using(var shape=SetupDrawing.Round(new RectangleF(1,5*s,15*s,15*s),4*s)){using(var brush=new SolidBrush(Checked?theme.Accent:SetupTheme.Mix(theme.Surface,theme.Text,.08f)))g.FillPath(brush,shape);using(var pen=new Pen(Focused?theme.Accent:SetupTheme.Mix(theme.Surface,theme.Text,.22f)))g.DrawPath(pen,shape);}if(Checked)using(var pen=new Pen(theme.Surface,1.6f*s))g.DrawLines(pen,new[]{new PointF(5*s,12*s),new PointF(8*s,15*s),new PointF(13*s,9*s)});using(var brush=new SolidBrush(SetupTheme.Mix(theme.Surface,theme.Text,.65f)))g.DrawString(Text,Font,brush,22*s,5*s);}
+ public sealed class SetupCheck:Control {
+  readonly SetupTheme theme;bool value,keyPressed;public bool Checked{get{return value;}set{this.value=value;Invalidate();if(IsHandleCreated)AccessibilityNotifyClients(AccessibleEvents.StateChange,-1);}}
+  public SetupCheck(SetupTheme t){theme=t;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable|ControlStyles.StandardClick,true);BackColor=t.Surface;Cursor=Cursors.Hand;TabStop=true;AccessibleRole=AccessibleRole.CheckButton;}
+  protected override void OnPaintBackground(PaintEventArgs e){}
+  protected override void OnClick(EventArgs e){if(Enabled)Checked=!Checked;base.OnClick(e);}
+  protected override void OnGotFocus(EventArgs e){Invalidate();base.OnGotFocus(e);}protected override void OnLostFocus(EventArgs e){keyPressed=false;Invalidate();base.OnLostFocus(e);}
+  protected override bool IsInputKey(Keys key){return key==Keys.Space||base.IsInputKey(key);}
+  protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Space){keyPressed=true;e.Handled=true;e.SuppressKeyPress=true;}base.OnKeyDown(e);}
+  protected override void OnKeyUp(KeyEventArgs e){if(e.KeyCode==Keys.Space){bool click=keyPressed;keyPressed=false;if(click)OnClick(EventArgs.Empty);e.Handled=true;e.SuppressKeyPress=true;}base.OnKeyUp(e);}
+  protected override AccessibleObject CreateAccessibilityInstance(){return new CheckAccessibility(this);}
+  sealed class CheckAccessibility:ControlAccessibleObject{readonly SetupCheck check;public CheckAccessibility(SetupCheck check):base(check){this.check=check;}public override string DefaultAction{get{return "Переключить";}}public override AccessibleStates State{get{return base.State|(check.Checked?AccessibleStates.Checked:AccessibleStates.None);}}public override void DoDefaultAction(){if(check.Enabled)check.OnClick(EventArgs.Empty);}}
+  protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;SetupDrawing.ChildBackdrop(g,this,theme);g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;float s=Height/26f;using(var shape=SetupDrawing.Round(new RectangleF(1,5*s,15*s,15*s),4*s)){using(var brush=new SolidBrush(Checked?theme.Accent:SetupTheme.Mix(theme.Surface,theme.Text,.08f)))g.FillPath(brush,shape);using(var pen=new Pen(Focused?theme.Accent:SetupTheme.Mix(theme.Surface,theme.Text,.22f)))g.DrawPath(pen,shape);}if(Checked)using(var pen=new Pen(theme.Surface,1.6f*s))g.DrawLines(pen,new[]{new PointF(5*s,12*s),new PointF(8*s,15*s),new PointF(13*s,9*s)});using(var brush=new SolidBrush(SetupTheme.Mix(theme.Surface,theme.Text,.65f)))g.DrawString(Text,Font,brush,22*s,5*s);}
  }
  public sealed class SetupForm:Form {
-  readonly SetupSurface surface;readonly SetupButton retry;readonly SetupCheck shortcut;bool running;readonly string[] args;long lastProgress;
+  readonly SetupSurface surface;readonly SetupButton retry,closeButton,minimizeButton;readonly SetupCheck shortcut;bool running;readonly string[] args;long lastProgress;
   [System.Runtime.InteropServices.DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref int value,int size);
   [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool ReleaseCapture();
   [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam);
-  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);try{int dark=1,round=2;DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,33,ref round,4);}catch{}}
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]struct FrameRect{public int Left,Top,Right,Bottom;}
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]struct FrameMargins{public int Left,Right,Top,Bottom;}
+  [System.Runtime.InteropServices.DllImport("dwmapi.dll")]static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd,ref FrameMargins margins);
+  [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int width,int height,uint flags);
+  [System.Runtime.InteropServices.DllImport("user32.dll")]static extern uint GetDpiForWindow(IntPtr hwnd);
+  // Retain a real frame for DWM. A painted rounded outline on a frameless HWND
+  // cannot clip its rectangular corners or provide the native antialiased edge.
+  protected override CreateParams CreateParams{get{var value=base.CreateParams;value.Style|=0x00040000|0x000A0000;value.Style&=~(0x00C00000|0x00010000);value.Style&=0x7fffffff;return value;}}
+  void ApplyFrame(){if(!IsHandleCreated)return;try{int dark=1,round=2,render=2;DwmSetWindowAttribute(Handle,20,ref dark,4);DwmSetWindowAttribute(Handle,2,ref render,4);DwmSetWindowAttribute(Handle,33,ref round,4);Color line=SetupTheme.Mix(BackColor,ForeColor,.11f);int color=line.R|(line.G<<8)|(line.B<<16);DwmSetWindowAttribute(Handle,34,ref color,4);var margins=new FrameMargins{Left=1,Right=1,Top=1,Bottom=1};DwmExtendFrameIntoClientArea(Handle,ref margins);}catch{}}
+  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ApplyFrame();}
+  protected override void OnActivated(EventArgs e){base.OnActivated(e);ApplyFrame();}
+  protected override void OnLoad(EventArgs e){base.OnLoad(e);LayoutAtDpi();CenterToScreen();}
+  void LayoutAtDpi(){if(surface==null||!IsHandleCreated)return;uint dpi=96;try{dpi=GetDpiForWindow(Handle);}catch{}if(dpi==0)dpi=96;float scale=dpi/96f;
+   SetWindowPos(Handle,IntPtr.Zero,0,0,(int)Math.Round(560*scale)+2,(int)Math.Round(410*scale)+2,0x0036);
+   closeButton.SetBounds((int)Math.Round(510*scale),(int)Math.Round(24*scale),(int)Math.Round(28*scale),(int)Math.Round(28*scale));
+   minimizeButton.SetBounds((int)Math.Round(476*scale),(int)Math.Round(24*scale),(int)Math.Round(28*scale),(int)Math.Round(28*scale));
+   shortcut.SetBounds((int)Math.Round(28*scale),(int)Math.Round(368*scale),(int)Math.Round(280*scale),(int)Math.Round(26*scale));
+   retry.SetBounds((int)Math.Round(386*scale),(int)Math.Round(365*scale),(int)Math.Round(150*scale),(int)Math.Round(32*scale));ApplyFrame();surface.Invalidate();
+  }
+  protected override void WndProc(ref Message message){
+   if(message.Msg==0x0083&&message.LParam!=IntPtr.Zero){var rect=(FrameRect)System.Runtime.InteropServices.Marshal.PtrToStructure(message.LParam,typeof(FrameRect));if(rect.Right-rect.Left>2){rect.Left++;rect.Right--;}if(rect.Bottom-rect.Top>2){rect.Top++;rect.Bottom--;}System.Runtime.InteropServices.Marshal.StructureToPtr(rect,message.LParam,false);message.Result=IntPtr.Zero;return;}
+   base.WndProc(ref message);
+   if(message.Msg==0x0084){long hit=message.Result.ToInt64();if(hit>=10&&hit<=17)message.Result=new IntPtr(18);}
+   else if(message.Msg==0x02E0)LayoutAtDpi();else if(message.Msg==0x031E)ApplyFrame();
+  }
   public SetupForm(string[] args){this.args=args;var theme=SetupTheme.Load();SuspendLayout();Text="EclipseIsland";AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(560,410);FormBorderStyle=FormBorderStyle.None;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;BackColor=theme.Surface;ForeColor=theme.Text;Font=new Font("Segoe UI",9);try{Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{}
    surface=new SetupSurface(theme){Dock=DockStyle.Fill};Controls.Add(surface);surface.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left&&e.Y<100*surface.Width/560f){ReleaseCapture();SendMessage(Handle,0xA1,new IntPtr(2),IntPtr.Zero);}};
-   var close=new SetupButton(theme){Text="×",AccessibleName="Закрыть",TabIndex=3};close.SetBounds(510,24,28,28);close.Click+=(s,e)=>Close();surface.Controls.Add(close);
-   var minimize=new SetupButton(theme){Text="−",AccessibleName="Свернуть",TabIndex=2};minimize.SetBounds(476,24,28,28);minimize.Click+=(s,e)=>{WindowState=FormWindowState.Minimized;surface.Changed();};surface.Controls.Add(minimize);Resize+=(s,e)=>surface.Changed();
+   var close=closeButton=new SetupButton(theme){Glyph="close",AccessibleName="Закрыть",TabIndex=3};close.SetBounds(510,24,28,28);close.Click+=(s,e)=>Close();surface.Controls.Add(close);
+   var minimize=minimizeButton=new SetupButton(theme){Glyph="minimize",AccessibleName="Свернуть",TabIndex=2};minimize.SetBounds(476,24,28,28);minimize.Click+=(s,e)=>{WindowState=FormWindowState.Minimized;surface.Changed();};surface.Controls.Add(minimize);Resize+=(s,e)=>surface.Changed();
    shortcut=new SetupCheck(theme){Text="Ярлык на рабочем столе",Checked=true,Visible=!Core.Installed(Core.LoadState().version),TabIndex=0};shortcut.SetBounds(28,368,280,26);surface.Controls.Add(shortcut);
    retry=new SetupButton(theme,true){Text="Повторить",Visible=false,TabIndex=1};retry.SetBounds(386,365,150,32);retry.Click+=async(s,e)=>await Run();surface.Controls.Add(retry);AcceptButton=retry;
-   Shown+=async(s,e)=>await Run();ResumeLayout(false);
+   Shown+=async(s,e)=>{LayoutAtDpi();if(!args.Contains("--preview"))await Run();};ResumeLayout(false);
+  }
+  public void PreviewState(string kind){if(!args.Contains("--preview"))throw new InvalidOperationException("Preview only");surface.Theme.ReducedMotion=true;shortcut.Visible=kind=="check";retry.Visible=kind=="error";
+   Stage(kind=="error"?"НЕ УДАЛОСЬ ПРОДОЛЖИТЬ":kind=="download"?"ЗАГРУЗКА ПРИЛОЖЕНИЯ":"ПРОВЕРКА ОБНОВЛЕНИЙ",kind=="download"?1:0);
+   UpdateText(kind=="error"?"Не удалось скачать обновление":kind=="download"?"Скачиваем EclipseIsland 1.0.1":"Проверяем обновления…",kind=="error"?"Проверьте подключение и повторите попытку":kind=="download"?"48,0 / 179,9 МБ   ·   26%":"Ищем последнюю версию EclipseIsland");
+   surface.Indeterminate=kind=="check";surface.Target=kind=="download"?26:0;surface.Failed=kind=="error";surface.Changed();
   }
   void UpdateText(string text,string note=""){if(IsDisposed)return;surface.Heading=text;surface.Detail=note;surface.Failed=false;surface.Indeterminate=true;surface.Changed();}
   void Stage(string phase,int step){surface.Phase=phase;surface.Step=step;surface.Target=0;surface.Changed();}

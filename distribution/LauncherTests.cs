@@ -3,11 +3,35 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Security.Cryptography;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Runtime.InteropServices;
 namespace EclipseIslandSetup {
  static class LauncherTests {
   static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS "+name);}
   static void Reject(Action action,string name){try{action();}catch{Console.WriteLine("PASS "+name);return;}throw new Exception(name);}
-  static void Main(){
+  [DllImport("user32.dll")]static extern int GetWindowLong(IntPtr window,int index);
+  static void CheckControls(){
+   var theme=new SetupTheme();using(var button=new SetupButton(theme){Glyph="close",Size=new Size(28,28)}){
+    int clicks=0;button.Click+=(s,e)=>clicks++;button.PerformClick();button.Enabled=false;button.PerformClick();Check(clicks==1,"custom button invokes once and ignores disabled activation");button.Enabled=true;
+    foreach(bool hover in new[]{false,true})foreach(bool pressed in new[]{false,true})using(var bitmap=new Bitmap(28,28)){
+     using(var graphics=Graphics.FromImage(bitmap))button.PaintButton(graphics,hover,pressed);
+     Color corner=bitmap.GetPixel(0,0);Check(corner.R>0&&corner.G>0&&corner.B>0&&corner.R<80&&corner.G<80&&corner.B<90,"button paints an opaque themed background without black/white native squares");
+     Color background=bitmap.GetPixel(4,14);int marks=0;for(int y=8;y<21;y++)for(int x=8;x<21;x++){Color c=bitmap.GetPixel(x,y);if(Math.Abs(c.R-background.R)+Math.Abs(c.G-background.G)+Math.Abs(c.B-background.B)>90)marks++;}Check(marks>=8,"close glyph remains visible in every pointer state");
+    }
+   }
+   using(var check=new SetupCheck(theme)){check.AccessibilityObject.DoDefaultAction();Check(check.Checked,"custom checkbox supports accessible activation");check.Enabled=false;check.AccessibilityObject.DoDefaultAction();Check(check.Checked,"disabled checkbox does not change state");}
+   if(!SystemInformation.UserInteractive){Console.WriteLine("SKIP native window previews: no interactive desktop");return;}
+   using(var form=new SetupForm(new[]{"--preview"})){
+    form.Show();Application.DoEvents();int style=GetWindowLong(form.Handle,-16);Check((style&0x00040000)!=0&&(style&0x00C00000)==0,"real frame retained without a native caption over the custom buttons");Check(form.Width-form.ClientSize.Width==2&&form.Height-form.ClientSize.Height==2,"custom client leaves exactly one native border pixel on every edge");
+    Check(Math.Abs(form.ClientSize.Width/560f-form.ClientSize.Height/410f)<.02f,"DPI layout keeps the content aspect ratio");
+    string directory=Path.Combine(Environment.CurrentDirectory,"release-online","ui-check");Directory.CreateDirectory(directory);
+    foreach(string state in new[]{"check","download","error"}){form.PreviewState(state);Application.DoEvents();using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(directory,"setup-"+state+".png"),System.Drawing.Imaging.ImageFormat.Png);}}
+    form.Close();
+   }
+  }
+  [STAThread]static void Main(){
+   Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);CheckControls();
    var theme=SetupTheme.FromSettings(new System.Collections.Generic.Dictionary<string,object>{{"accent","blue"},{"surfaceColor","#15121f"},{"reducedMotion",true},{"loaderRenderer","frosted"}});
    Check(theme.Accent.R==179&&theme.Accent.G==214&&theme.Accent.B==255&&theme.Surface.R==21,"launcher follows the application palette");
    Check(theme.ReducedMotion&&theme.Renderer=="frosted","launcher follows loader and reduced-motion preferences");
