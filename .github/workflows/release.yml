@@ -6,7 +6,7 @@ on:
       version:
         description: 'Stable version, for example 1.0.2'
         required: true
-        default: '1.0.5'
+        default: '1.0.6'
       notes:
         description: 'Release notes'
         required: false

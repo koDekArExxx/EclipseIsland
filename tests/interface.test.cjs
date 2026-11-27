@@ -404,5 +404,6 @@ test('weather source, stale marker and untrusted descriptions render safely on t
  const f=await fixture(true);try{const d=f.document;d.querySelector('[data-expand]').click();d.querySelector('[data-island-tab="weather"]').click();
  f.emit('weather',{status:'ready',city:'Москва',temperature:-3,feels:-9,code:71,isDay:true,wind:5,source:'wttr.in',description:'<img src=x onerror=alert(1)>',stale:true,updatedAt:1000});
  assert.match(d.querySelector('.island-weather').textContent,/wttr\.in/);assert.match(d.querySelector('.island-weather').textContent,/Сохранённые данные/);assert.match(d.querySelector('.island-weather').textContent,/<img/);assert.equal(d.querySelector('.island-weather img'),null);
+ f.emit('weather',{status:'ready',city:'Москва',temperature:-2,feels:null,code:3,isDay:true,wind:3.5,source:'MET Norway',description:'Пасмурно',stale:false,updatedAt:2000});assert.match(d.querySelector('.island-weather').textContent,/MET Norway/);assert.equal(d.querySelector('.island-weather').textContent.includes('Ощущается'),false);
  }finally{f.dom.window.close();}
 });

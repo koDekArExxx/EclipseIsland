@@ -9,3 +9,8 @@ The adapted dataset russian-cities.js remains under CC BY-SA 4.0. Application co
 Weather source: wttr.in, https://wttr.in/ , https://github.com/chubin/wttr.in
 Day/night icon uses an approximate solar elevation calculation from NOAA:
 https://gml.noaa.gov/grad/solcalc/solareqns.PDF
+
+Additional weather sources and attribution:
+MET Norway: https://api.met.no/ ; documentation and licensing: https://api.met.no/doc/License
+Open-Meteo: https://open-meteo.com/ ; weather data attribution: https://open-meteo.com/en/licence
+Actual selected source is displayed in the application.

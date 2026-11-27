@@ -15,7 +15,7 @@ app.on('browser-window-created',(_event,window)=>applyAppIdentity(window));
 const { sanitize, migrateLegacySettings } = require('./settings.cjs');
 const { configureAutostart } = require('./autostart.cjs');
 const { refreshLauncher } = require('./launcher-update.cjs');
-const { searchCities, getWeather, useWeatherFetch } = require('./weather.cjs');
+const { searchCities, getWeather, useWeatherFetch, configureWeatherCache } = require('./weather.cjs');
 const { MediaHub } = require('./media-hub.cjs');
 const { registerMediaShortcuts } = require('./media-shortcuts.cjs');
 const { CaptureController } = require('./capture.cjs');
@@ -106,7 +106,7 @@ function restoreOverlayInteraction(){
 }
 function configureWindow(window) {
   applyAppIdentity(window);
-  window.webContents.setWindowOpenHandler(({url}) => {if(['https://wttr.in/','https://github.com/hflabs/city'].includes(url))shell.openExternal(url);return {action:'deny'};});
+  window.webContents.setWindowOpenHandler(({url}) => {if(['https://wttr.in/','https://api.met.no/','https://open-meteo.com/','https://github.com/hflabs/city'].includes(url))shell.openExternal(url);return {action:'deny'};});
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_,__,callback)=>callback(false));
   const visible=()=>{if(!window.isDestroyed()&&!window.isMinimized?.())syncView(window);};
@@ -236,6 +236,7 @@ if(!app.requestSingleInstanceLock()){
   app.whenReady().then(()=>{
     app.setAppUserModelId('app.eclipseisland.desktop');
     if(net?.fetch)useWeatherFetch?.((url,options)=>net.fetch(url,options));
+    configureWeatherCache?.(preferencesDirectory);
     refreshLauncher(app).catch(error=>console.error('Launcher update',error.code||error.message));
     settingsPath=path.join(app.getPath('userData'),'settings.json');
     try{settings=sanitize(JSON.parse(fs.readFileSync(settingsPath,'utf8')));}catch{

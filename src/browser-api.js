@@ -11,11 +11,11 @@ export function createBrowserAPI(){
     try{
       const value=await weatherClient.getWeather(settings.city,{force});if(g!==generation)return weather;
       weather={status:'ready',...value};
-    }catch{if(g!==generation)return weather;weather={...weather,status:'error',error:'Нет соединения с сервисом погоды'};}
+    }catch(error){if(g!==generation)return weather;weather={...weather,status:'error',error:error.message||'Нет соединения с сервисом погоды'};}
     emit('weather',weather);return weather;
   }
   return {
-    init:async()=>({settings,weather,media:{available:false,reason:'Системная музыка доступна в приложении Windows'},autostart:{supported:false,enabled:false},platform:'browser',version:'1.0.5',shortcuts:{expand:false,visibility:false},monitors:[],downloads:{items:[],recent:[],status:'ready'}}),
+    init:async()=>({settings,weather,media:{available:false,reason:'Системная музыка доступна в приложении Windows'},autostart:{supported:false,enabled:false},platform:'browser',version:'1.0.6',shortcuts:{expand:false,visibility:false},monitors:[],downloads:{items:[],recent:[],status:'ready'}}),
     save:async value=>{localStorage.setItem('island-settings',JSON.stringify(value));settings=value;emit('settings',settings);return settings;},
     cities:async query=>{try{return {ok:true,items:await weatherClient.searchCities(query)};}catch{return {ok:false,error:'Нет соединения с сервисом поиска'};}},
     selectCity:async city=>{settings={...settings,city};localStorage.setItem('island-settings',JSON.stringify(settings));emit('settings',settings);return refreshWeather(true);},

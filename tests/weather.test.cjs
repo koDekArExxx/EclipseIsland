@@ -1,5 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {createWeatherClient,parseWeather,daylight}=require('../src/weather-client.js');
+const {createWeatherClient:createBase,parseWeather,parseMet,daylight}=require('../src/weather-client.js');
+const createWeatherClient=options=>createBase({providers:['wttr'],...options});
 const cities=require('../src/russian-cities.js');
 const city={name:'Москва',latitude:55.7558,longitude:37.6173};
 const payload=()=>({current_condition:[{temp_C:'-3',FeelsLikeC:'-9',windspeedKmph:'18',weatherCode:'326',lang_ru:[{value:'Слабый снег'}]}],weather:[{maxtempC:'-2',mintempC:'-6'}]});
@@ -29,7 +30,7 @@ test('simultaneous requests share one fetch, fresh cache avoids requests and ret
 test('a temporary outage returns only same-city cache with an explicit stale marker and original time',async()=>{
  let time=100000,broken=false;const c=createWeatherClient({now:()=>time,fetch:async()=>{if(broken)throw Error('Offline');return ok();}});
  const original=await c.getWeather(city);time+=600001;broken=true;const saved=await c.getWeather(city);assert.equal(saved.stale,true);assert.equal(saved.updatedAt,original.updatedAt);assert.equal(saved.temperature,-3);
- await assert.rejects(()=>c.getWeather({...city,name:'Казань',longitude:49.1115}),/Не удалось/);time+=21600001;await assert.rejects(()=>c.getWeather(city),/Не удалось/);
+ await assert.rejects(()=>c.getWeather({...city,name:'Казань',longitude:49.1115}),/недоступна/);time+=21600001;await assert.rejects(()=>c.getWeather(city),/недоступна/);
 });
 test('invalid input and incomplete or empty measurements are rejected, not converted to zero',()=>{
  assert.throws(()=>parseWeather(payload(),{...city,latitude:NaN}),/корректный/);
@@ -42,6 +43,35 @@ test('day/night icons account for coordinates and polar day instead of the PC ti
 });
 
 test('desktop weather facade can use the Electron transport without a Node fetch',async()=>{
- const service=require('../electron/weather.cjs');let calls=0;service.useWeatherFetch(async url=>{calls++;assert.match(url,/^https:\/\/ru\.wttr\.in\//);return ok();});
- try{assert.equal((await service.getWeather({...city,longitude:37.6178})).source,'wttr.in');assert.equal(calls,1);}finally{service.useWeatherFetch((...args)=>fetch(...args));}
+ const service=require('../electron/weather.cjs');let calls=0;service.useWeatherFetch(async url=>{calls++;assert.match(url,/^https:/);return ok();});
+ try{assert.equal((await service.getWeather({...city,longitude:37.6178})).source,'wttr.in');assert.ok(calls>=1&&calls<=4);}finally{service.useWeatherFetch((...args)=>fetch(...args));}
+});
+
+function metPayload(){return {properties:{timeseries:[{time:'2026-11-27T10:00:00Z',data:{instant:{details:{air_temperature:-2,wind_speed:3.5}},next_1_hours:{summary:{symbol_code:'cloudy'}}}},{time:'2026-11-27T12:00:00Z',data:{instant:{details:{air_temperature:-1,wind_speed:4}}}}]}};}
+test('independent providers race: blocked wttr and Open-Meteo cannot block a valid MET forecast',async()=>{
+ const requests=[];const c=createBase({now:()=>Date.UTC(2026,10,27,10),fetch:async(url,options)=>{requests.push(new URL(url).hostname);if(url.includes('api.met.no')){assert.match(options.headers['User-Agent'],/EclipseIsland/);return {ok:true,json:async()=>metPayload()};}throw Error('Blocked');}});
+ const w=await c.getWeather(city);assert.equal(w.source,'MET Norway');assert.equal(w.temperature,-2);assert.equal(w.feels,null);assert.equal(w.high,-1);assert.ok(requests.includes('api.open-meteo.com'));assert.ok(requests.includes('ru.wttr.in'));
+});
+test('a hanging provider is aborted when another returns valid data',async()=>{
+ let aborted=false;const c=createBase({providers:['met','wttr'],fetch:async(url,options)=>{if(url.includes('api.met.no'))return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>{aborted=true;reject(Error('Aborted'));},{once:true}));return ok();}});
+ assert.equal((await c.getWeather(city)).source,'wttr.in');assert.equal(aborted,true);
+});
+test('MET Expires is honored even for manual refresh',async()=>{
+ let time=Date.UTC(2026,10,27,10),calls=0;const c=createBase({providers:['met'],now:()=>time,fetch:async()=>{calls++;return {ok:true,headers:{get:()=>new Date(time+3600000).toUTCString()},json:async()=>metPayload()};}});
+ await c.getWeather(city);time+=60000;await c.getWeather(city,{force:true});assert.equal(calls,1);
+});
+test('validated disk cache can restore same-city data during an outage, but corrupt entries are ignored',async()=>{
+ let time=100000;const a=createWeatherClient({now:()=>time,fetch:async()=>ok()});await a.getWeather(city);const entries=a.cacheEntries();time+=700000;
+ const b=createBase({now:()=>time,fetch:async()=>{throw Error('Offline');}});b.loadCache([...entries,{key:'no',value:{city:'bad'}}]);const w=await b.getWeather(city);assert.equal(w.city,'Москва');assert.equal(w.stale,true);assert.equal(b.cacheEntries().length,1);
+});
+
+test('a broken Electron request falls back to Node transport without going to the real network',async()=>{
+ const service=require('../electron/weather.cjs'),original=global.fetch;let fallbackCalls=0;
+ service.useWeatherFetch(async()=>{throw TypeError('Chromium network failed');});global.fetch=async()=>{fallbackCalls++;return ok();};
+ try{const w=await service.getWeather({...city,longitude:37.6191});assert.equal(w.source,'wttr.in');assert.ok(fallbackCalls>0);}finally{global.fetch=original;service.useWeatherFetch((...args)=>fetch(...args));}
+});
+test('desktop weather cache writes atomically and can be restored after a restart',async()=>{
+ const fs=require('node:fs/promises'),path=require('node:path'),service=require('../electron/weather.cjs');const base=path.resolve(__dirname,'../test-results/tmp');await fs.mkdir(base,{recursive:true});const root=await fs.mkdtemp(path.join(base,'weather-cache-'));const target={...city,longitude:37.6198};
+ service.configureWeatherCache(root);service.useWeatherFetch(async()=>ok());
+ try{await service.getWeather(target);await service.flushWeatherCache();const saved=JSON.parse(await fs.readFile(path.join(root,'weather-cache.json'),'utf8'));assert.ok(saved.length>0);const b=createBase({now:()=>Date.now()+700000,fetch:async()=>{throw Error('Offline');}});b.loadCache(saved);const w=await b.getWeather(target);assert.equal(w.city,'Москва');assert.equal(w.stale,true);assert.equal(await fs.stat(path.join(root,'weather-cache.json.tmp')).catch(()=>null),null);}finally{await service.flushWeatherCache();service.useWeatherFetch((...args)=>fetch(...args));await fs.rm(root,{recursive:true,force:true});}
 });
