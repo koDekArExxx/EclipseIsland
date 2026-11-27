@@ -27,3 +27,12 @@ test('preview recovery cycles native input, refreshes the shape and re-arms a de
  v.set(true,true);const release=v.suspend();calls.length=0;assert.equal(v.recover(),false);assert.equal(calls.length,0);release();
  w.dead=true;calls.length=0;assert.equal(v.recover(),false);assert.equal(calls.length,0);
 });
+
+test('screenshot recovery runs a bounded second pass, cancelled by a current pointer acknowledgement',()=>{
+ const timers=new Map(),calls=[];let id=0;
+ const w={ignored:false,isDestroyed:()=>false,isVisible:()=>true,setOpacity(){},setFocusable(){},setIgnoreMouseEvents:v=>{w.ignored=v;calls.push(v);},webContents:{send(){}}};
+ const v=new OverlayVisibility(w,{setTimer:(fn,ms)=>{timers.set(++id,{fn,ms});return id;},clearTimer:key=>timers.delete(key)});v.set(true,true);const release=v.suspend();release();assert.equal(w.ignored,false);
+ const late=[...timers.values()].find(x=>x.ms===700);assert.ok(late);w.ignored=true;late.fn();assert.equal(w.ignored,false);
+ v.recover();const epoch=v.generation;v.inputReady(epoch-1);assert.ok(timers.size>0,'stale pre-screenshot events cannot cancel repair');v.inputReady(epoch);assert.equal(timers.size,0);
+ v.recover();const stale=[...timers.values()].find(x=>x.ms===700);v.set(false,true);stale.fn();assert.equal(w.ignored,true,'late repair never unhides a disabled island');
+});

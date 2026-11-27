@@ -66,7 +66,7 @@
      const controller=controllers[i];timeouts.push(setTimeout(()=>controller.abort(),timeout));
      try{
       let result,value;
-      if(provider==='met'){result=await json('https://api.met.no/weatherapi/locationforecast/2.0/compact?'+new URLSearchParams({lat:city.latitude.toFixed(4),lon:city.longitude.toFixed(4)}),controller.signal,{'User-Agent':'EclipseIsland/1.0.6 (https://github.com/koDekArExxx/EclipseIsland)'});value=parseMet(result.data,city,now());}
+      if(provider==='met'){result=await json('https://api.met.no/weatherapi/locationforecast/2.0/compact?'+new URLSearchParams({lat:city.latitude.toFixed(4),lon:city.longitude.toFixed(4)}),controller.signal,{'User-Agent':'EclipseIsland/1.0.7 (https://github.com/koDekArExxx/EclipseIsland)'});value=parseMet(result.data,city,now());}
       else if(provider==='openmeteo'){result=await json('https://api.open-meteo.com/v1/forecast?'+new URLSearchParams({latitude:city.latitude.toFixed(4),longitude:city.longitude.toFixed(4),current:'temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m',daily:'temperature_2m_max,temperature_2m_min',timezone:'auto',forecast_days:'1',wind_speed_unit:'ms'}),controller.signal);value=parseOpenMeteo(result.data,city,now());}
       else{for(const host of HOSTS){try{result=await json(host+key+'?format=j1&lang=ru',controller.signal);value=parseWeather(result.data,city,now());break;}catch(error){if(controller.signal.aborted)throw error;}}if(!value)throw Error('wttr недоступен');}
       return {value,expiresAt:Math.max(now()+ttl,Number.isFinite(result.expires)?result.expires:0)};

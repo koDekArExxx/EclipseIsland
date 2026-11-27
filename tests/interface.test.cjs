@@ -407,3 +407,10 @@ test('weather source, stale marker and untrusted descriptions render safely on t
  f.emit('weather',{status:'ready',city:'Москва',temperature:-2,feels:null,code:3,isDay:true,wind:3.5,source:'MET Norway',description:'Пасмурно',stale:false,updatedAt:2000});assert.match(d.querySelector('.island-weather').textContent,/MET Norway/);assert.equal(d.querySelector('.island-weather').textContent.includes('Ощущается'),false);
  }finally{f.dom.window.close();}
 });
+
+test('screenshot input reset releases an interrupted pointer and leaves expanded controls clickable',async()=>{
+ const f=await fixture(true);try{const d=f.document,w=f.w;let released=0;d.querySelector('[data-expand]').click();const target=d.querySelector('[data-island-tab="weather"]');target.hasPointerCapture=id=>id===9;target.releasePointerCapture=id=>{assert.equal(id,9);released++;};
+ const down=new w.Event('pointerdown',{bubbles:true});Object.defineProperty(down,'pointerId',{value:9});target.dispatchEvent(down);target.classList.add('button-press');f.emit('input-reset',77);
+ assert.equal(released,1);assert.equal(target.classList.contains('button-press'),false);assert.equal(d.querySelector('.island-expanded').inert,false);target.click();assert.ok(d.querySelector('.island-weather,.island-empty'));
+ }finally{f.dom.window.close();}
+});

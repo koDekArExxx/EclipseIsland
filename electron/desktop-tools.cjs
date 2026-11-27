@@ -148,7 +148,7 @@ class DesktopTools{
    if(config.openAfter)this.preview(entry);
    return {ok:true,id,copied:config.copy&&!this.error,error:this.error};
   }catch(error){this.error=error.message;return {ok:false,error:error.message};}
-  finally{try{restore?.();}finally{this.busy=false;this.remaining=0;this.publish();}}
+  finally{try{restore?.();}finally{this.busy=false;this.remaining=0;try{this.publish();}finally{try{this.restoreOverlay();}catch{}}}}
  }
  close(){this.canceled=true;this.selection?.finish(null);for(const [window]of this.viewers)if(!window.isDestroyed())window.destroy();}
 }

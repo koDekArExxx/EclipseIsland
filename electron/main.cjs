@@ -161,6 +161,7 @@ function registerIPC() {
     tools?.updatePreviewTheme();capture?.updatePreviewTheme();broadcast('settings',settings);if(startupChanged)broadcast('autostart',autostart);return settings;
   });
   handle('launcher:processes',()=>tools.listProcesses().catch(error=>({ok:false,error:error.message})));
+  listen('island:input-ready',(event,epoch)=>{if(event.sender===overlay?.webContents&&Number.isSafeInteger(epoch))overlayVisibility?.inputReady(epoch);});
   listen('island:focus-input',(event,value)=>{if(event.sender===overlay?.webContents&&settings.enabled){overlay.setFocusable(!!value);if(value)overlay.focus();}});
   handle('launcher:action',async(action,id,value)=>{try{return await tools.launcher(action,id,value,dashboard?.isVisible()?dashboard:undefined);}catch(error){return {ok:false,error:error.message};}});
   handle('screenshot:action',async(action,id)=>tools.screenshot(action,id).catch(error=>({ok:false,error:error.message})));

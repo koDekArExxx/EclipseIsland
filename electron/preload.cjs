@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('island', {
   launcherProcesses:()=>ipcRenderer.invoke('launcher:processes'),
+  inputReady:epoch=>ipcRenderer.send('island:input-ready',epoch),
   focusInput:value=>ipcRenderer.send('island:focus-input',value),
   launcher:(action,id,value)=>ipcRenderer.invoke('launcher:action',action,id,value),
   screenshot:(action,id)=>ipcRenderer.invoke('screenshot:action',action,id),

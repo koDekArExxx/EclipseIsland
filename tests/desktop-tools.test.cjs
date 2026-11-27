@@ -22,7 +22,7 @@ test('launcher persists picked targets, reorders and renames them; removing a pi
  }finally{f.close();}
 });
 test('full screenshot writes PNG and copies a Blob using Electron 45 clipboard API, then history can open or copy it',async()=>{
- const f=fixture();try{const r=await f.tools.take('screen');assert.equal(r.ok,true);assert.equal(r.copied,true);assert.equal(f.restored(),1);const shot=f.tools.recent[0];assert.equal(shot.width,2880);assert.ok(fs.existsSync(shot.file));assert.equal(f.writes.length,1);const blob=f.writes[0][0].items['image/png'];assert.equal(blob.type,'image/png');assert.equal(await blob.text(),'PNG');await f.tools.screenshot('open',r.id);assert.equal(f.windows.length,1);assert.equal(f.tools.viewers.size,1);assert.equal(f.opened.length,0);f.windows[0].close();assert.equal(f.overlayRestored(),1);await f.tools.screenshot('copy',r.id);assert.equal(f.writes.length,2);assert.equal(f.tools.busy,false);
+ const f=fixture();try{const r=await f.tools.take('screen');assert.equal(r.ok,true);assert.equal(r.copied,true);assert.equal(f.restored(),1);const shot=f.tools.recent[0];assert.equal(shot.width,2880);assert.ok(fs.existsSync(shot.file));assert.equal(f.writes.length,1);const blob=f.writes[0][0].items['image/png'];assert.equal(blob.type,'image/png');assert.equal(await blob.text(),'PNG');await f.tools.screenshot('open',r.id);assert.equal(f.windows.length,1);assert.equal(f.tools.viewers.size,1);assert.equal(f.opened.length,0);f.windows[0].close();assert.equal(f.overlayRestored(),2);await f.tools.screenshot('copy',r.id);assert.equal(f.writes.length,2);assert.equal(f.tools.busy,false);
  }finally{f.close();}
 });
 test('area screenshot crops the original frame; cancellation writes nothing and always restores application surfaces',async()=>{
@@ -64,7 +64,7 @@ test('launch all continues after one missing target and reports the result',asyn
  const f=fixture();try{for(const name of ['A.exe','B.exe','C.exe']){const file=path.join(f.dir,name);fs.writeFileSync(file,'exe');await f.tools.addTarget(file,'app');}fs.unlinkSync(f.tools.entries[1].target);const result=await f.tools.launcher('open-all');assert.equal(result.launched,2);assert.equal(result.total,3);assert.equal(result.ok,false);assert.equal(f.opened.length,2);assert.equal(f.tools.launchingAll,false);assert.ok(f.states.some(x=>x.launchingAll));}finally{f.close();}
 });
 test('internal photo viewer authorizes only its own renderer and restores the island when closed',async()=>{
- const f=fixture();try{const result=await f.tools.take('screen');await f.tools.screenshot('open',result.id);const window=f.windows[0];assert.throws(()=>f.handlers['screenshot-preview:frame']({sender:{}}));assert.ok(f.handlers['screenshot-preview:frame']({sender:window.webContents}).image.startsWith('data:image/png;'));await f.handlers['screenshot-preview:action']({sender:window.webContents},'copy');assert.equal(f.writes.length,2);f.events['screenshot-preview:close']({sender:{}});assert.equal(window.isDestroyed(),false);f.events['screenshot-preview:close']({sender:window.webContents});assert.equal(f.overlayRestored(),1);assert.equal(f.tools.viewers.size,0);}finally{f.close();}
+ const f=fixture();try{const result=await f.tools.take('screen');await f.tools.screenshot('open',result.id);const window=f.windows[0];assert.throws(()=>f.handlers['screenshot-preview:frame']({sender:{}}));assert.ok(f.handlers['screenshot-preview:frame']({sender:window.webContents}).image.startsWith('data:image/png;'));await f.handlers['screenshot-preview:action']({sender:window.webContents},'copy');assert.equal(f.writes.length,2);f.events['screenshot-preview:close']({sender:{}});assert.equal(window.isDestroyed(),false);f.events['screenshot-preview:close']({sender:window.webContents});assert.equal(f.overlayRestored(),2);assert.equal(f.tools.viewers.size,0);}finally{f.close();}
 });
 
 test('cursor preference persists, validates boolean values and reaches full-screen and area capture',async()=>{
@@ -88,4 +88,14 @@ test('native screenshot failure restores surfaces and does not silently save a c
   assert.equal((await f.tools.take('screen')).error,'native capture failed');
   assert.equal(f.restored(),1);assert.equal(f.tools.busy,false);assert.equal(f.tools.recent.length,0);
  }finally{f.close();}
+});
+
+test('screenshot input is restored only after completion, including cancellation and capture failure',async()=>{
+ const f=fixture();const states=[];f.tools.restoreOverlay=()=>states.push({busy:f.tools.busy,remaining:f.tools.remaining,selection:!!f.tools.selection});
+ try{await f.tools.take('screen');f.tools.select=async()=>null;await f.tools.take('area');f.e.desktopCapturer.getSources=async()=>{throw Error('Capture failed');};await f.tools.take('screen');assert.equal(states.length,3);assert.ok(states.every(x=>!x.busy&&x.remaining===0&&!x.selection));}finally{f.close();}
+});
+
+test('input recovery still runs if the final screenshot notification fails',async()=>{
+ const f=fixture();let restored=0;f.tools.restoreOverlay=()=>restored++;const publish=f.tools.publish.bind(f.tools);let calls=0;f.tools.publish=()=>{calls++;if(calls>1&&!f.tools.busy)throw Error('Renderer unavailable');publish();};
+ try{await assert.rejects(()=>f.tools.take('screen'),/Renderer unavailable/);assert.equal(f.tools.busy,false);assert.equal(restored,1);}finally{f.close();}
 });
