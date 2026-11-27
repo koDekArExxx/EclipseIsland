@@ -4,12 +4,13 @@ const wait=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await 
 async function fixture(options={}){
  let clock=0,command,recorder,finished,nextFrame,paints=0;const formats=[],segments=[],audioNodes=[];const reports=[],chunks=[],timers=new Map(),requests=[],tracks=[];let timerId=0;
  const track=kind=>{const value={kind,stopped:false,stop(){this.stopped=true;},addEventListener(){},applyConstraints:async()=>{},getSettings:()=>({frameRate:60,...(options.nativeTrack&&kind==='video'?{width:options.width||1920,height:options.height||1080}:{})})};tracks.push(value);return value;};
- const screenTrack=track('video'),systemTrack=track('audio'),outputTrack=track('video'),micTrack=track('audio'),mixed=track('audio');
+ let requestedFrames=0;const screenTrack=track('video'),systemTrack=track('audio'),outputTrack=track('video'),micTrack=track('audio'),mixed=track('audio');
  const stream=values=>({getTracks:()=>values,getVideoTracks:()=>values.filter(x=>x.kind==='video'),getAudioTracks:()=>values.filter(x=>x.kind==='audio'),addTrack:value=>values.push(value)});
  const config={...defaults,countdown:0,systemAudio:false,microphone:false,height:720,fps:120,sourceId:'screen:chosen',...options.config};
  const screen=stream([screenTrack,...(config.systemAudio?[systemTrack]:[])]),output=stream([outputTrack]);
  const video={videoWidth:options.width||1920,videoHeight:options.height||1080,srcObject:null,play:async()=>{}};
  if(options.frameCallbacks){video.requestVideoFrameCallback=fn=>{nextFrame=fn;return 1;};video.cancelVideoFrameCallback=()=>{nextFrame=null;};}
+ if(options.manualFrames)outputTrack.requestFrame=()=>requestedFrames++;
  const canvas={getContext:()=>({drawImage(){paints++;}}),captureStream:()=>output};
  class Recorder{
   static isTypeSupported(type){if(options.allCodecs)return true;return options.h264?type.includes('avc1'):type.includes('vp8');}
@@ -25,7 +26,7 @@ async function fixture(options={}){
 
  const api={format:async value=>formats.push(value),segment:async value=>{segments.push(value);if(options.segmentGate)await options.segmentGate;},init:async()=>config,chunk:async bytes=>{if(options.writeError)throw Error('Disk full');await new Promise(r=>setTimeout(r,2));chunks.push(Buffer.from(bytes).toString());},report:state=>reports.push(state),finish:async state=>{finished=state;},on:fn=>command=fn};
  await vm.runInNewContext(source,{window:{captureWorker:api,capturePolicy:require('../src/capture-policy.js')},document:{querySelector:selector=>selector==='video'?video:canvas},navigator:{mediaCapabilities:options.capabilities,mediaDevices:{getDisplayMedia:async()=>{if(options.captureError)throw Object.assign(Error('Capture failed'),{name:options.captureError});return screen;},getUserMedia:async request=>{requests.push(request);return request.video?screen:stream([micTrack]);}}},MediaStream:function(values){return stream(values);},process:{argv:[]},MediaRecorder:Recorder,AudioContext:Audio,Blob,Uint8Array,performance:{now:()=>clock},setTimeout,clearTimeout,setInterval:(fn,ms)=>{timers.set(++timerId,{fn,ms});return timerId;},clearInterval:id=>timers.delete(id)});
- return {reports,chunks,requests,tracks,video,canvas,output,formats,segments,audioNodes,paints:()=>paints,frame:ms=>{clock+=ms;nextFrame?.();},recorder:()=>recorder,finished:()=>finished,command:value=>command(value),advance:ms=>{clock+=ms;timers.forEach(x=>{if(x.ms===500)x.fn();});}};
+ return {reports,chunks,requests,tracks,video,canvas,output,formats,segments,audioNodes,requestedFrames:()=>requestedFrames,timers,paints:()=>paints,frame:ms=>{clock+=ms;nextFrame?.();},recorder:()=>recorder,finished:()=>finished,command:value=>command(value),advance:ms=>{clock+=ms;timers.forEach(x=>{if(x.ms===1000)x.fn();});}};
 }
 test('recorder scales output, pauses elapsed time, serializes chunks and flushes the last chunk on stop',async()=>{
  const f=await fixture();assert.equal(f.canvas.width,1280);assert.equal(f.canvas.height,720);assert.match(f.recorder().settings.mimeType,/vp8/);
@@ -88,3 +89,11 @@ test('auto prefers a reported power-efficient codec over a software-only candida
 });
 
 test('resize fallback draws only at the requested cadence even when the source callback is faster',async()=>{const f=await fixture({frameCallbacks:true,config:{height:720,fps:30}});for(let i=0;i<60;i++)f.frame(1000/60);assert.ok(f.paints()<=32&&f.paints()>=29);const before=f.paints();f.command('pause');for(let i=0;i<60;i++)f.frame(1000/60);assert.equal(f.paints(),before);f.command('stop');await wait(()=>f.finished());});
+
+test('canvas requests one encoded frame per selected draw and telemetry is quiet in replay',async()=>{
+ const f=await fixture({manualFrames:true,frameCallbacks:true,config:{height:720,fps:30,mode:'replay'}});
+ for(let i=0;i<60;i++)f.frame(1000/60);
+ assert.equal(f.requestedFrames(),f.paints());assert.ok(f.requestedFrames()<=32);
+ assert.equal([...f.timers.values()].some(x=>x.ms===1000),false,'replay has no UI telemetry interval');
+ f.command('stop');await wait(()=>f.finished());
+});

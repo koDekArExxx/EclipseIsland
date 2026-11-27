@@ -322,8 +322,8 @@ html.dashboard-document .app-shell{background-clip:padding-box;transform:transla
 /* 1.0.2: keep static UI static. Hidden cover decoration must not animate beneath artwork. */
 .has-artwork>.vinyl{animation:none!important}
 html[data-performance=balanced] .island:not(.expanded):not(:hover) .equalizer>i{animation-play-state:paused!important}
-html[data-performance=eco] .island *,html[data-performance=eco] .island *::before,html[data-performance=eco] .island *::after{animation:none!important;will-change:auto!important}
-html[data-performance=eco] .island,html[data-performance=eco] .island *,html[data-performance=eco] .island::before,html[data-performance=eco] .island::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;box-shadow:none!important}
+html[data-performance=eco] .island :is(.equalizer>i,.vinyl,.record-dot,.indeterminate i,.media-pending,.weather-orb>.icon,.is-indeterminate .transfer-meter i),html[data-performance=eco] .island .artwork-loading::after{animation:none!important;will-change:auto!important}
+html[data-performance=eco] .island,html[data-performance=eco] .island *,html[data-performance=eco] .island::before,html[data-performance=eco] .island::after,html[data-performance=eco] .island *::before,html[data-performance=eco] .island *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;box-shadow:none!important}
 html[data-performance=eco] .island{transition-duration:.18s!important}
 html[data-performance=eco] .island .island-expanded{transition-duration:.16s!important}
 .capture-presets{display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
@@ -331,3 +331,12 @@ html[data-performance=eco] .island .island-expanded{transition-duration:.16s!imp
 .capture-presets button strong,.capture-presets button small{display:block}.capture-presets button strong{color:var(--text);font-size:12px}.capture-presets button small{color:var(--muted);font-size:10px;margin-top:5px}.capture-presets button:hover{border-color:var(--accent)}.capture-presets button:disabled{opacity:.4}
 
 .capture-presets button[aria-pressed=true]{border-color:var(--accent);background:rgba(var(--accent-rgb),.15)}
+
+/* 1.0.3: brief action animations remain smooth even in the economical mode. */
+.island-panel{animation:none}
+.island-panel-content.panel-enter{animation:panelSwap .2s cubic-bezier(.2,.7,.25,1) both}
+@keyframes panelSwap{from{opacity:.35;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+html[data-performance=eco] .island .panel-enter{animation-duration:.16s}
+html.reduced-motion .island .panel-enter{animation:none!important}
+.island-tabs>button{transition:background-color .16s ease,color .16s ease,transform .16s ease}
+.island-tabs>button:active{transform:scale(.95)}

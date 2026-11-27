@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {EventEmitter}=require('node:events');
 test('island is nonactivating and media updates do not focus or show game-overlay windows',async()=>{
-  const windows=[],accelerators=new Map(),startedServices=[];let update;
+  const windows=[],accelerators=new Map(),startedServices=[];let update,restoreFromPreview;
   // Exercise the Windows startup branch on every host without starting native services.
   const testProcess={...process,platform:'win32',env:{},argv:[process.execPath]};
   class Window extends EventEmitter{
@@ -22,7 +22,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
     if(name==='./spotify-direct.cjs')return {readToken:()=> 'a'.repeat(64)};
     if(name==='./media-hub.cjs')return {MediaHub:class{constructor(callback){this.state={};update=value=>{this.state={...this.state,...value};callback(value);};}start(){}}};
     if(name==='./capture.cjs')return {CaptureController:class{
-      constructor(){startedServices.push('capture');this.state={status:'idle'};this.store={settings:{...require('../electron/capture-store.cjs').defaults}};}
+      constructor(...args){restoreFromPreview=args[4]?.restoreOverlay;startedServices.push('capture');this.state={status:'idle'};this.store={settings:{...require('../electron/capture-store.cjs').defaults}};}
       snapshot(){return {active:false,status:'idle'};}async refresh(){}async stop(){}
     }};
     if(name==='./replay.cjs')return {ReplayController:class{
@@ -62,6 +62,9 @@ test('island is nonactivating and media updates do not focus or show game-overla
   const fresh=dashboard.messages.filter(m=>m.type==='snapshot').at(-1);
   assert.equal(fresh.value.media.title,'Changed while minimized');assert.ok(Number.isInteger(fresh.sequence));
   assert.equal(dashboard.messages.at(-2).type,'view-visible');assert.equal(dashboard.messages.at(-2).value,true);
+  assert.equal(typeof restoreFromPreview,'function');const shapeCount=overlay.shapes.length;overlay.ignored=true;const focusCount=overlay.focuses;
+  restoreFromPreview();assert.equal(overlay.ignored,false);assert.ok(overlay.shapes.length>shapeCount);assert.equal(overlay.focuses,focusCount);
+  hide();await new Promise(resolve=>setTimeout(resolve,230));const hiddenOpacity=overlay.opacity;restoreFromPreview();assert.equal(overlay.opacity,hiddenOpacity);assert.equal(overlay.ignored,true);
   windows.length=0;
   vm.runInNewContext(fs.readFileSync(main,'utf8'),{require:requireMock,__dirname:path.dirname(main),process:{...testProcess,argv:[process.execPath,'--autostart']},setInterval:()=>1,clearInterval:()=>{},setTimeout,console});
   await new Promise(resolve=>setImmediate(resolve));

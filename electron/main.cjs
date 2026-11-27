@@ -98,6 +98,12 @@ function startHitFallback(){
   },100);
 }
 function syncView(window){if(window.isDestroyed())return;window.webContents.send('state',{type:'view-visible',value:true});window.webContents.send('state',{type:'snapshot',value:{settings,weather,media:mediaState,autostart,spotifySetup:spotifySetup?.state,capture:capture?.snapshot()||null,transfers:transferState,tools:tools?.snapshot()||null,replay:replay?.snapshot()||null,downloads:downloadsState},sequence:delivery.sent(window.webContents.id)});}
+function restoreOverlayInteraction(){
+ if(quitting||!settings?.enabled||!overlay||overlay.isDestroyed())return;
+ overlay.setAlwaysOnTop(settings.topmost,'screen-saver');
+ overlayVisibility?.recover();
+ if(settings.topmost)overlay.moveTop?.();
+}
 function configureWindow(window) {
   applyAppIdentity(window);
   window.webContents.setWindowOpenHandler(({url}) => {if(url==='https://open-meteo.com/')shell.openExternal(url);return {action:'deny'};});
@@ -239,14 +245,14 @@ if(!app.requestSingleInstanceLock()){
       capture=new CaptureController({app,BrowserWindow,desktopCapturer,dialog,shell,protocol,ipcMain,screen},preferencesDirectory,value=>{broadcast('capture',value);if(recordWasActive&&!value.active&&!waitingForCaptureQuit)replay?.configure(capture.store.settings,true);recordWasActive=value.active;},config=>{
         applyOverlayProtection(config?.excludeIsland);
         if(config?.hideSettings&&dashboard&&!dashboard.isDestroyed())dashboard.hide();
-      },{getTheme:()=>settings});
+      },{getTheme:()=>settings,restoreOverlay:restoreOverlayInteraction});
       replay=new ReplayController({app,BrowserWindow,desktopCapturer,dialog,shell,protocol,ipcMain,screen},preferencesDirectory,capture.store,value=>{broadcast('replay',value);if(value.lastSaved&&capture.state.lastSaved!==value.lastSaved){capture.state.lastSaved=value.lastSaved;capture.refresh().catch(()=>{});}},config=>{applyOverlayProtection(config?.excludeIsland);});
       transfers=new TransferMonitor(value=>{transferState=value;completionNotices.transfer(value);broadcast('transfers',value);});
     }
     spotifySetup=new SpotifySetup(preferencesDirectory,value=>broadcast('spotify-setup',value));
     downloads=new DownloadsMonitor(preferencesDirectory,value=>{downloadsState=value;completionNotices.download(value);broadcast('downloads',value);},{folder:app.getPath('downloads'),telegramFolders:process.env.APPDATA?[path.join(process.env.APPDATA,'Telegram Desktop','tdata','temp_data')]:[],ayuFolders:process.env.APPDATA?['AyuGram','AyuGram Desktop','AyuGramDesktop'].map(name=>path.join(process.env.APPDATA,name,'tdata','temp_data')):[]});
     downloads.setAyuFolder(settings.ayuDownloadFolder);downloadsState=downloads.snapshot();
-    tools=new DesktopTools({app,BrowserWindow,desktopCapturer,screen,clipboard,ClipboardItem,nativeImage,shell,dialog,ipcMain},preferencesDirectory,value=>broadcast('tools',value),{restoreOverlay:()=>{if(!quitting){positionOverlay();if(settings.enabled&&overlay&&!overlay.isDestroyed())overlay.moveTop();}},getTheme:()=>settings,hideSurfaces:config=>{
+    tools=new DesktopTools({app,BrowserWindow,desktopCapturer,screen,clipboard,ClipboardItem,nativeImage,shell,dialog,ipcMain},preferencesDirectory,value=>broadcast('tools',value),{restoreOverlay:restoreOverlayInteraction,getTheme:()=>settings,hideSurfaces:config=>{
       const resume=config.excludeIsland?overlayVisibility?.suspend():null;
       const hiddenDashboard=config.hideSettings&&dashboard&&!dashboard.isDestroyed()&&dashboard.isVisible()?dashboard:null;
       if(hiddenDashboard)try{hiddenDashboard.setOpacity(0);}catch{}

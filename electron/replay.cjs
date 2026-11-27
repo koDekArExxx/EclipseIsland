@@ -25,7 +25,7 @@ class ReplayController{
  suspend(){return this.configure(this.settings||this.videoStore.settings,false);}
  async start(settings){
   this.publish({status:'starting',error:null});await this.verifyEncoder();await fs.rm(this.root,{recursive:true,force:true});await fs.mkdir(this.root,{recursive:true});this.segments=[];
-  this.store=new CaptureStore(path.join(this.root,'data'),this.root);this.store.settings={...settings,folder:this.root};
+  this.store=new CaptureStore(path.join(this.root,'data'),this.root,{transient:true});this.store.settings={...settings,folder:this.root};
   const sources=await this.e.desktopCapturer.getSources({types:['screen','window'],thumbnailSize:{width:0,height:0}}),display=String(this.e.screen?.getPrimaryDisplay?.()?.id);
   const source=settings.source?sources.find(x=>x.id===settings.source):sources.find(x=>x.display_id===display&&x.id.startsWith('screen:'))||sources.find(x=>x.id.startsWith('screen:'));
   if(!source)throw Error('Выберите доступный экран для повтора');

@@ -14,3 +14,16 @@ test('temporary screenshot suspension restores desired visibility, never a stale
  const restore=v.suspend();v.set(false);restore();assert.equal(w.opacity,0);assert.equal(w.ignored,true);assert.equal(v.visible,false);
  v.set(true);const first=v.suspend(),second=v.suspend();first();assert.equal(w.opacity,0);second();assert.equal(w.opacity,1);
 });
+
+
+test('preview recovery cycles native input, refreshes the shape and re-arms a delayed repair without focus',()=>{
+ const timers=new Map(),calls=[];let id=0,refresh=0;
+ const w={dead:false,visible:true,isDestroyed(){return this.dead;},isVisible(){return this.visible;},setFocusable:v=>calls.push(['focusable',v]),setIgnoreMouseEvents:v=>calls.push(['ignore',v]),setOpacity:v=>calls.push(['opacity',v]),webContents:{send:()=>{}}};
+ const v=new OverlayVisibility(w,{beforeShow:()=>refresh++,setTimer:fn=>{timers.set(++id,fn);return id;},clearTimer:key=>timers.delete(key)});
+ v.set(true,true);calls.length=0;const before=refresh;
+ assert.equal(v.recover(),true);assert.deepEqual(calls.filter(x=>x[0]==='ignore').map(x=>x[1]),[true,false]);assert.equal(refresh,before+1);
+ const repair=[...timers.values()][0];repair();assert.equal(refresh,before+2);assert.equal(calls.at(-1)[1],false);assert.ok(calls.filter(x=>x[0]==='focusable').every(x=>x[1]===false));
+ v.set(false,true);calls.length=0;assert.equal(v.recover(),false);assert.equal(calls.length,0);
+ v.set(true,true);const release=v.suspend();calls.length=0;assert.equal(v.recover(),false);assert.equal(calls.length,0);release();
+ w.dead=true;calls.length=0;assert.equal(v.recover(),false);assert.equal(calls.length,0);
+});

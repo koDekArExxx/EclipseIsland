@@ -5,7 +5,7 @@ const {CaptureStore}=require('./capture-store.cjs');
 const {exportMP4,verifyEncoder}=require('./mp4-export.cjs');
 class CaptureController{
  constructor(electron,directory,onUpdate,onProtection,options={}){
-  this.exportMP4=options.exportMP4||exportMP4;this.verifyEncoder=options.verifyEncoder||verifyEncoder;this.e=electron;this.onUpdate=onUpdate;this.onProtection=onProtection;this.getTheme=options.getTheme||(()=>({}));this.store=new CaptureStore(directory,electron.app.getPath('videos'));
+  this.exportMP4=options.exportMP4||exportMP4;this.verifyEncoder=options.verifyEncoder||verifyEncoder;this.e=electron;this.onUpdate=onUpdate;this.onProtection=onProtection;this.getTheme=options.getTheme||(()=>({}));this.restoreOverlay=options.restoreOverlay||(()=>{});this.store=new CaptureStore(directory,electron.app.getPath('videos'));
   this.state={status:'idle',elapsed:0,bytes:0};this.recent=this.store.items;this.writes=Promise.resolve();this.saves=Promise.resolve();this.previews=new Set();this.recovery=this.store.recover().catch(()=>{this.state.warnings=['Не удалось восстановить прошлый фрагмент. Проверьте папку записей'];});
   const worker=event=>!!this.window&&!this.window.isDestroyed()&&event.sender===this.window.webContents;
   electron.ipcMain.handle('capture-worker:init',event=>{if(!worker(event)||!this.current)throw Error('Unknown recorder');return this.current.config;});
@@ -107,7 +107,7 @@ class CaptureController{
   if(action==='reveal'){this.e.shell.showItemInFolder(item.file);return {ok:true};}
   if(action==='preview'){
    const window=new this.e.BrowserWindow({width:1020,height:720,minWidth:600,minHeight:420,title:'EclipseIsland — '+item.name,frame:false,transparent:true,hasShadow:false,backgroundColor:'#00000000',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preview-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,autoplayPolicy:'no-user-gesture-required'}});
-   setupPreview(window,this.getTheme);window.captureId=item.id;this.previews.add(window);window.on('closed',()=>this.previews.delete(window));const sendState=()=>{if(!window.isDestroyed())window.webContents.send('capture-preview:state',{fullscreen:window.isFullScreen(),maximized:window.isMaximized()});};for(const event of ['enter-full-screen','leave-full-screen','maximize','unmaximize'])window.on(event,sendState);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());window.loadFile(path.join(__dirname,'../src/recording-preview.html'));return {ok:true};
+   setupPreview(window,this.getTheme);window.captureId=item.id;this.previews.add(window);window.on('closed',()=>{this.previews.delete(window);this.restoreOverlay();});for(const event of ['minimize','leave-full-screen','unmaximize'])window.on(event,()=>this.restoreOverlay());window.webContents.on('render-process-gone',()=>{if(!window.isDestroyed())window.destroy();});const sendState=()=>{if(!window.isDestroyed())window.webContents.send('capture-preview:state',{fullscreen:window.isFullScreen(),maximized:window.isMaximized()});};for(const event of ['enter-full-screen','leave-full-screen','maximize','unmaximize'])window.on(event,sendState);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());window.loadFile(path.join(__dirname,'../src/recording-preview.html')).catch(()=>{if(!window.isDestroyed())window.destroy();});return {ok:true};
   }
   throw Error('Неизвестное действие записи');
  }

@@ -63,3 +63,8 @@ test('replay audio settings migrate once and remain independent from ordinary re
 });
 
 test('old customized bitrates stay manual while untouched defaults receive automatic quality',()=>{assert.equal(sanitize({bitrate:28}).quality,'manual');assert.equal(sanitize({replayBitrate:12}).replayQuality,'manual');assert.equal(sanitize({bitrate:16}).quality,'auto');assert.equal(sanitize({bitrate:28,quality:'auto'}).quality,'auto');});
+
+test('replay fragments stay valid files without permanent indexes or crash markers',async()=>{
+ const root=await folder(),store=new CaptureStore(path.join(root,'buffer-data'),root,{transient:true});
+ try{const session=await store.create();await store.setFormat(session,'video/webm;codecs=vp8');await store.append(session,webm());const saved=await store.finish(session,1.5);assert.ok(saved);assert.ok((await fs.stat(saved.file)).size>0);assert.equal(store.items.length,0);assert.equal(await fs.stat(store.indexFile).catch(()=>null),null);assert.equal(await fs.stat(store.pendingFile).catch(()=>null),null);}finally{await fs.rm(root,{recursive:true,force:true});}
+});

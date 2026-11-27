@@ -1,6 +1,13 @@
 // Never detach the nonactivating Chromium input surface through native hide/show.
 class OverlayVisibility{
  constructor(window,{beforeShow=()=>{},afterHide=()=>{},duration=200,setTimer=setTimeout,clearTimer=clearTimeout}={}){Object.assign(this,{window,beforeShow,afterHide,duration,setTimer,clearTimer});this.visible=null;this.generation=0;}
+ recover(){
+  if(this.visible!==true||this.suspended||this.window.isDestroyed())return false;
+  // Reattach native mouse input after another HWND used fullscreen/video focus.
+  // Keep the same nonactivating surface and honor a user's explicit Hide.
+  this.window.setFocusable?.(false);this.window.setIgnoreMouseEvents?.(true,{forward:true});
+  this.set(true,true);return true;
+ }
  suspend(){
   this.suspended=(this.suspended||0)+1;this.generation++;this.clearTimer(this.timer);this.clearTimer(this.inputTimer);
   if(!this.window.isDestroyed()){this.window.setFocusable?.(false);this.window.setIgnoreMouseEvents?.(true,{forward:true});this.window.setOpacity?.(0);}

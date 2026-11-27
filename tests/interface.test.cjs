@@ -389,3 +389,13 @@ test('performance mode and capture presets persist real settings',async()=>{
   assert.equal(f.captureSaves.at(-1).fps,30);assert.equal(f.captureSaves.at(-1).height,720);assert.equal(f.captureSaves.at(-1).quality,'auto');
  }finally{f.dom.window.close();}
 });
+
+test('switching island panels preserves compact cover, navigation and focus; repeating a tab keeps content',async()=>{
+ const f=await fixture(true);try{const d=f.document;f.emit('media',{available:true,active:true,trackKey:'stable',title:'Stable',playing:true,artwork:'data:image/png;base64,aGVsbG8=',canToggle:true});
+ const compact=d.querySelector('[data-expand]'),cover=compact.querySelector('.cover-image');compact.click();
+ const tabs=d.querySelector('.island-tabs'),weather=tabs.querySelector('[data-island-tab="weather"]');weather.focus();weather.click();
+ assert.equal(d.querySelector('[data-expand]'),compact);assert.equal(d.querySelector('.compact-art .cover-image'),cover);assert.equal(d.querySelector('.island-tabs'),tabs);assert.equal(d.activeElement,weather);
+ const content=d.querySelector('.island-panel-content');assert.ok(content.classList.contains('panel-enter'));weather.click();assert.equal(d.querySelector('.island-panel-content'),content);
+ tabs.querySelector('[data-island-tab="capture"]').click();f.emit('capture',{active:true,status:'recording',elapsed:1,settings:{},recent:[]});assert.equal(d.querySelector('.island-tabs'),tabs);assert.equal(d.querySelector('[data-expand]'),compact);
+ }finally{f.dom.window.close();}
+});

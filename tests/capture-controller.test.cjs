@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs/promises'),path=require('node:path');const {EventEmitter}=require('node:events');const {CaptureController}=require('../electron/capture.cjs');
 test('capture controller validates the worker, selects the primary display, flushes before stop and serves private previews',async()=>{
  const temporary=path.resolve(__dirname,'../test-results/tmp');await fs.mkdir(temporary,{recursive:true});
- const root=await fs.mkdtemp(path.join(temporary,'capture-controller-')),handlers={},listeners={},routes={},windows=[],changes=[],protection=[];
+ const root=await fs.mkdtemp(path.join(temporary,'capture-controller-')),handlers={},listeners={},routes={},windows=[],changes=[],protection=[];let restored=0;
  class Window extends EventEmitter{
   static getAllWindows(){return [{getMediaSourceId:()=> 'window:own'},...windows];}
   constructor(options){super();this.options=options;this.dead=false;this.messages=[];this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.send=(...args)=>this.messages.push(args);this.webContents.setWindowOpenHandler=()=>{};
@@ -12,7 +12,7 @@ test('capture controller validates the worker, selects the primary display, flus
  }
  const sources=[{id:'screen:other',name:'Second',display_id:'8',thumbnail:{toDataURL:()=>''}},{id:'screen:primary',name:'Primary',display_id:'7',thumbnail:{toDataURL:()=>''}},{id:'window:own',name:'Island',thumbnail:{toDataURL:()=>''}}];
  const electron={app:{getPath:()=>path.join(root,'videos')},BrowserWindow:Window,screen:{getPrimaryDisplay:()=>({id:7})},desktopCapturer:{getSources:async()=>sources},ipcMain:{handle:(name,fn)=>handlers[name]=fn,on:(name,fn)=>listeners[name]=fn},protocol:{handle:(name,fn)=>routes[name]=fn},shell:{openPath:async()=>'',showItemInFolder(){}},dialog:{}};
- const c=new CaptureController(electron,path.join(root,'data'),value=>changes.push(value),value=>protection.push(value),{verifyEncoder:async()=>{},exportMP4:async()=>{throw Error('test export unavailable');}});
+ const c=new CaptureController(electron,path.join(root,'data'),value=>changes.push(value),value=>protection.push(value),{restoreOverlay:()=>restored++,verifyEncoder:async()=>{},exportMP4:async()=>{throw Error('test export unavailable');}});
  try{
   await assert.rejects(c.save({folder:'relative'}));await c.save({folder:path.join(root,'saved'),height:1440,fps:120});
   assert.equal((await c.sources()).some(x=>x.id==='window:own'),false);await c.start();const window=c.window,event={sender:window.webContents};
@@ -40,10 +40,10 @@ test('capture controller validates the worker, selects the primary display, flus
   await c.action('preview',c.recent[0].id);const preview=[...c.previews][0],previewEvent={sender:preview.webContents};
   await assert.rejects(handlers['capture-preview:action']({sender:window.webContents},'fullscreen'),/Unknown preview/);
   assert.equal((await handlers['capture-preview:action'](previewEvent,'fullscreen')).fullscreen,true);assert.equal(preview.isFullScreen(),true);assert.equal(preview.messages.at(-1)[0],'capture-preview:state');
-  assert.equal((await handlers['capture-preview:action'](previewEvent,'exit-fullscreen')).fullscreen,false);
+  assert.equal(restored,0);assert.equal((await handlers['capture-preview:action'](previewEvent,'exit-fullscreen')).fullscreen,false);assert.equal(restored,1);preview.emit('minimize');assert.equal(restored,2);
   assert.equal((await handlers['capture-preview:action'](previewEvent,'maximize')).maximized,true);assert.equal((await handlers['capture-preview:action'](previewEvent,'maximize')).maximized,false);
   await assert.rejects(handlers['capture-preview:action'](previewEvent,'not-an-action'));
-  await handlers['capture-preview:action'](previewEvent,'close');assert.equal(c.previews.size,0);
+  const beforeClose=restored;await handlers['capture-preview:action'](previewEvent,'close');assert.equal(c.previews.size,0);assert.equal(restored,beforeClose+1);await c.action('preview',c.recent[0].id);const crashed=[...c.previews][0];const beforeCrash=restored;crashed.webContents.emit('render-process-gone');assert.equal(c.previews.size,0);assert.equal(restored,beforeCrash+1);
   const head=await routes['eclipse-recording'](new Request('eclipse-recording://video/'+c.recent[0].id,{method:'HEAD'}));assert.equal(head.status,200);assert.equal(head.body,null);assert.ok(Number(head.headers.get('Content-Length'))>0);
   const abort=new AbortController();abort.abort();assert.equal((await routes['eclipse-recording'](new Request('eclipse-recording://video/'+c.recent[0].id,{signal:abort.signal}))).status,499);
   const mp4=await c.store.response(c.recent[0].id,'bytes=0-15');assert.equal(mp4.headers.get('Content-Type'),'video/mp4');

@@ -40,8 +40,10 @@
   }else{
    capturePath='resize';video.srcObject=screen;await video.play();canvas.width=width;canvas.height=height;outputWidth=width;outputHeight=height;
    const ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
-   let lastPaint=-Infinity;const paint=()=>{const now=performance.now();if(!stopping&&recorder?.state!=='paused'&&now-lastPaint>=1000/config.fps-.5){ctx.drawImage(video,0,0,width,height);lastPaint=now;}};paint();
-   output=canvas.captureStream(config.fps);
+   let manualFrame,lastPaint=-Infinity;const paint=()=>{const now=performance.now();if(!stopping&&recorder?.state!=='paused'&&now-lastPaint>=1000/config.fps-.5){ctx.drawImage(video,0,0,width,height);manualFrame?.requestFrame();lastPaint=now;}};
+   output=canvas.captureStream(0);manualFrame=output.getVideoTracks()[0];
+   if(typeof manualFrame?.requestFrame!=='function'){for(const track of output.getTracks())track.stop();manualFrame=null;output=canvas.captureStream(config.fps);}
+   paint();
    if(video.requestVideoFrameCallback){const next=()=>{paint();if(!stopping)videoFrame=video.requestVideoFrameCallback(next);};videoFrame=video.requestVideoFrameCallback(next);}
    else draw=setInterval(paint,1000/Math.min(config.fps,actual.frameRate||sourceSettings.frameRate||60));
   }
@@ -91,6 +93,6 @@
   started=performance.now();segmentStarted=started;recorder.start(1000);if(config.mode==='replay')segmentTimer=setTimeout(()=>rotate(false),5000);
   const sourceFPS=screenTrack.getSettings().frameRate||null;
   api.report({status:'recording',elapsed:0,width:outputWidth,height:outputHeight,targetFPS:config.fps,sourceFPS,codec:mimeType,capturePath,encodingEfficiency,videoBitrate,effectiveFPS,warnings});
-  metrics=setInterval(()=>{if(stopping)return;api.report({status:recorder.state==='paused'?'paused':'recording',elapsed:elapsed()});if(config.maxMinutes&&elapsed()>=config.maxMinutes*60)stop();},500);
+  if(config.mode!=='replay')metrics=setInterval(()=>{if(stopping)return;api.report({status:recorder.state==='paused'?'paused':'recording',elapsed:elapsed()});if(config.maxMinutes&&elapsed()>=config.maxMinutes*60)stop();},1000);
  }catch(error){const reason={NotAllowedError:'Запись не началась: доступ к экрану или микрофону отклонён',NotReadableError:'Источник захвата недоступен. Выберите экран или другое окно',NotFoundError:'Не найден выбранный экран или микрофон',OverconstrainedError:'Источник не поддерживает выбранные параметры. Уменьшите разрешение или FPS'}[error.name];await stop(reason||error.message||'Не удалось начать запись');}
 })();
