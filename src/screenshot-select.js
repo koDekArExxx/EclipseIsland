@@ -10,9 +10,10 @@ function applyTheme(input={}){
  for(const [key,value] of Object.entries(values))root.style.setProperty(key,String(value));
  root.dataset.renderer=['modern','liquid','frosted'].includes(s.uiRenderer)?s.uiRenderer:'modern';root.classList.toggle('reduced-motion',!!s.reducedMotion);
 }
-function finish(value){if(done)return;done=true;window.screenshot.finish(value);}
+function releasePointer(){const id=pointer;pointer=null;if(id!==null){try{if(document.body.hasPointerCapture?.(id))document.body.releasePointerCapture(id);}catch{}}}
+function finish(value){if(done)return;done=true;releasePointer();start=null;window.screenshot.finish(value);}
 function point(event){return {x:Math.max(0,Math.min(innerWidth,event.clientX)),y:Math.max(0,Math.min(innerHeight,event.clientY))};}
-function reset(){start=null;pointer=null;rect=null;selection.hidden=true;dimensions.hidden=true;shade.hidden=false;document.body.classList.remove('selecting');}
+function reset(){releasePointer();start=null;rect=null;selection.hidden=true;dimensions.hidden=true;shade.hidden=false;document.body.classList.remove('selecting');}
 function update(event){
  if(!start||event.pointerId!==pointer)return;const end=point(event);rect={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),width:Math.abs(end.x-start.x),height:Math.abs(end.y-start.y)};
  selection.hidden=false;shade.hidden=true;dimensions.hidden=false;Object.assign(selection.style,{left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px'});
@@ -24,7 +25,7 @@ function update(event){
  Object.assign(dimensions.style,{left:x+'px',top:y+'px'});
 }
 document.addEventListener('pointerdown',event=>{if(done||start||event.button!==0||event.target.closest('#hint'))return;start=point(event);pointer=event.pointerId;rect=null;document.body.classList.add('selecting');document.body.setPointerCapture?.(pointer);update(event);});
-document.addEventListener('pointermove',update);document.addEventListener('pointerup',event=>{if(!start||event.pointerId!==pointer)return;update(event);if(rect.width>=3&&rect.height>=3){const value=rect;start=null;pointer=null;finish(value);}else reset();});
+document.addEventListener('pointermove',update);document.addEventListener('pointerup',event=>{if(!start||event.pointerId!==pointer)return;update(event);if(rect.width>=3&&rect.height>=3){const value=rect;finish(value);}else reset();});
 document.addEventListener('pointercancel',event=>{if(event.pointerId===pointer)reset();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')finish(null);});document.addEventListener('contextmenu',event=>{event.preventDefault();finish(null);});document.querySelector('#cancel').onclick=()=>finish(null);
 window.addEventListener('blur',()=>finish(null));

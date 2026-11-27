@@ -19,8 +19,9 @@ with sync_playwright() as p:
                 for accent in ['#ffffff','#81e6b5']:
                     page = browser.new_page(viewport={'width':viewport[0],'height':viewport[1]}, device_scale_factor=1.5)
                     theme = {'advancedTheme': True, 'accent':'custom','customAccent':accent,'surfaceColor':'#000000','cardColor':'#101010','textColor':'#f5f5f5','mutedColor':'#aaaaaa','lineColor':'#333333','cardRadius':24,'uiRenderer':mode,'reducedMotion':True}
-                    load(page,'window.results=[];window.screenshot={frame:async()=>({image:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC2kAAAAASUVORK5CYII=",pixelWidth:'+str(int(viewport[0]*1.5))+',pixelHeight:'+str(int(viewport[1]*1.5))+',theme:'+json.dumps(theme)+'}),ready:()=>window.isReady=true,finish:v=>window.results.push(v)};')
+                    load(page,'window.results=[];window.screenshot={frame:async()=>({image:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC2kAAAAASUVORK5CYII=",pixelWidth:'+str(int(viewport[0]*1.5))+',pixelHeight:'+str(int(viewport[1]*1.5))+',theme:'+json.dumps(theme)+'}),ready:()=>window.isReady=true,finish:v=>{if(document.body.hasPointerCapture(window.lastPointer))throw Error("Pointer still captured at finish");window.results.push(v)}};')
                     page.wait_for_function('window.isReady === true')
+                    page.evaluate("document.addEventListener('pointerdown',e=>window.lastPointer=e.pointerId,true)")
                     assert page.locator('html').get_attribute('data-renderer') == mode
                     assert page.locator('#hint').evaluate('(e)=>getComputedStyle(e).borderRadius')=='36px'
                     assert page.locator('html').evaluate('(e)=>e.style.getPropertyValue("--accent")')==accent
@@ -41,7 +42,7 @@ with sync_playwright() as p:
                     page.close()
         # Escape and explicit cancellation return null.
         for action in ['escape','button','right']:
-            page=browser.new_page();load(page,'window.results=[];window.screenshot={frame:async()=>({image:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC2kAAAAASUVORK5CYII="}),ready:()=>window.isReady=true,finish:v=>window.results.push(v)};');page.wait_for_function('window.isReady===true')
+            page=browser.new_page();load(page,'window.results=[];window.screenshot={frame:async()=>({image:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC2kAAAAASUVORK5CYII="}),ready:()=>window.isReady=true,finish:v=>{if(document.body.hasPointerCapture(window.lastPointer))throw Error("Pointer still captured at finish");window.results.push(v)}};');page.wait_for_function('window.isReady===true')
             if action=='escape':page.keyboard.press('Escape')
             elif action=='button':page.locator('#cancel').click()
             else:page.mouse.click(10,150,button='right')

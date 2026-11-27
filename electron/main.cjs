@@ -104,6 +104,16 @@ function restoreOverlayInteraction(){
  overlayVisibility?.recover();
  if(settings.topmost)overlay.moveTop?.();
 }
+function resetOverlayAfterSelection(){
+ if(quitting)return;
+ // A fresh native input surface avoids reusing Chromium's stale mouse routing
+ // after a fullscreen selector owned OS capture. Keep every service running.
+ const previous=overlay;overlayVisibility?.dispose();overlayVisibility=null;
+ overlayHeartbeat=0;overlayTransferIds=[];transfers?.lease(false);
+ if(previous){delivery.views.delete(previous.webContents.id);if(!previous.isDestroyed())previous.destroy();}
+ overlay=null;lastShape='';ignored=false;createOverlay();
+ applyOverlayProtection(overlayProtection);
+}
 function configureWindow(window) {
   applyAppIdentity(window);
   window.webContents.setWindowOpenHandler(({url}) => {if(['https://wttr.in/','https://api.met.no/','https://open-meteo.com/','https://github.com/hflabs/city'].includes(url))shell.openExternal(url);return {action:'deny'};});
@@ -255,7 +265,7 @@ if(!app.requestSingleInstanceLock()){
     spotifySetup=new SpotifySetup(preferencesDirectory,value=>broadcast('spotify-setup',value));
     downloads=new DownloadsMonitor(preferencesDirectory,value=>{downloadsState=value;completionNotices.download(value);broadcast('downloads',value);},{folder:app.getPath('downloads'),telegramFolders:process.env.APPDATA?[path.join(process.env.APPDATA,'Telegram Desktop','tdata','temp_data')]:[],ayuFolders:process.env.APPDATA?['AyuGram','AyuGram Desktop','AyuGramDesktop'].map(name=>path.join(process.env.APPDATA,name,'tdata','temp_data')):[]});
     downloads.setAyuFolder(settings.ayuDownloadFolder);downloadsState=downloads.snapshot();
-    tools=new DesktopTools({app,BrowserWindow,desktopCapturer,screen,clipboard,ClipboardItem,nativeImage,shell,dialog,ipcMain},preferencesDirectory,value=>broadcast('tools',value),{restoreOverlay:restoreOverlayInteraction,getTheme:()=>settings,hideSurfaces:config=>{
+    tools=new DesktopTools({app,BrowserWindow,desktopCapturer,screen,clipboard,ClipboardItem,nativeImage,shell,dialog,ipcMain},preferencesDirectory,value=>broadcast('tools',value),{restoreOverlay:restoreOverlayInteraction,getTheme:()=>settings,resetOverlay:resetOverlayAfterSelection,hideSurfaces:config=>{
       const resume=config.excludeIsland?overlayVisibility?.suspend():null;
       const hiddenDashboard=config.hideSettings&&dashboard&&!dashboard.isDestroyed()&&dashboard.isVisible()?dashboard:null;
       if(hiddenDashboard)try{hiddenDashboard.setOpacity(0);}catch{}

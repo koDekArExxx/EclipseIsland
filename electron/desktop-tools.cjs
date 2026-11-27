@@ -37,7 +37,7 @@ async function captureWindowsFrame(e,display,showCursor){
 }
 class DesktopTools{
  constructor(e,directory,onUpdate,options={}){
-  this.e=e;this.captureFrame=options.captureFrame!==undefined?options.captureFrame:(process.platform==='win32'?(display,showCursor)=>captureWindowsFrame(e,display,showCursor):null);this.file=path.join(directory,'desktop-tools.json');this.onUpdate=onUpdate;this.hideSurfaces=options.hideSurfaces||(()=>()=>{});this.wait=options.wait||(ms=>new Promise(r=>setTimeout(r,ms)));this.busy=false;this.error=null;this.remaining=0;this.launchingAll=false;this.viewers=new Map();this.processes=new Map();this.processProvider=options.processProvider;this.restoreOverlay=options.restoreOverlay||(()=>{});this.getTheme=options.getTheme||(()=>({}));
+  this.e=e;this.captureFrame=options.captureFrame!==undefined?options.captureFrame:(process.platform==='win32'?(display,showCursor)=>captureWindowsFrame(e,display,showCursor):null);this.file=path.join(directory,'desktop-tools.json');this.onUpdate=onUpdate;this.hideSurfaces=options.hideSurfaces||(()=>()=>{});this.wait=options.wait||(ms=>new Promise(r=>setTimeout(r,ms)));this.busy=false;this.error=null;this.remaining=0;this.launchingAll=false;this.viewers=new Map();this.processes=new Map();this.processProvider=options.processProvider;this.restoreOverlay=options.restoreOverlay||(()=>{});this.resetOverlay=options.resetOverlay||(()=>this.restoreOverlay());this.getTheme=options.getTheme||(()=>({}));
   const folder=path.join(e.app.getPath('pictures'),'EclipseIsland');let saved={};try{saved=JSON.parse(fs.readFileSync(this.file,'utf8'));}catch{}
   this.config={...shotSettings(saved.config||{}),folder:typeof saved.config?.folder==='string'&&path.isAbsolute(saved.config.folder)?saved.config.folder:folder,copy:saved.config?.copy!==false};
   this.entries=Array.isArray(saved.entries)?saved.entries.filter(x=>typeof x?.id==='string'&&typeof x.name==='string'&&typeof x.target==='string'&&path.isAbsolute(x.target)&&['app','folder'].includes(x.kind)).slice(0,24).map(x=>({...x,icon:/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(x.icon||'')&&(x.icon||'').length<50000?x.icon:''})):[];
@@ -46,7 +46,7 @@ class DesktopTools{
   this.e.ipcMain.handle('screenshot-preview:action',async(event,action)=>{const item=this.viewerItem(event.sender);if(!item)throw Error('Unknown sender');if(!['copy','reveal'].includes(action))throw Error('Unknown action');return this.screenshot(action,item.id);});
   this.e.ipcMain.on('screenshot-preview:close',event=>{for(const [window]of this.viewers)if(!window.isDestroyed()&&window.webContents===event.sender)window.close();});
   this.e.ipcMain.handle('screenshot:frame',event=>{if(!this.selection||this.selection.window.isDestroyed()||event.sender!==this.selection.window.webContents)throw Error('Unknown sender');return this.selection.frame;});
-  this.e.ipcMain.on('screenshot:ready',event=>{const selection=this.selection;if(selection&&!selection.window.isDestroyed()&&event.sender===selection.window.webContents){selection.window.show();selection.window.focus();}});
+  this.e.ipcMain.on('screenshot:ready',event=>{const selection=this.selection;if(selection&&!selection.closing&&!selection.window.isDestroyed()&&event.sender===selection.window.webContents){selection.window.show();selection.window.focus();}});
   this.e.ipcMain.on('screenshot:finish',(event,rect)=>{if(this.selection&&!this.selection.window.isDestroyed()&&event.sender===this.selection.window.webContents)this.selection.finish(rect);});
  }
  snapshot(){return {entries:this.entries,settings:this.config,recent:this.recent,busy:this.busy,remaining:this.remaining,launchingAll:this.launchingAll,error:this.error};}
@@ -116,15 +116,22 @@ class DesktopTools{
   const window=new this.e.BrowserWindow({...display.bounds,frame:false,resizable:false,movable:false,skipTaskbar:true,alwaysOnTop:true,show:false,backgroundColor:'#111018',title:'EclipseIsland — Выделите область',webPreferences:{preload:path.join(__dirname,'screenshot-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window.setAlwaysOnTop(true,'screen-saver');window.setMenuBarVisibility(false);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());
   return new Promise((resolve,reject)=>{
-   let done=false;const timer=setTimeout(()=>finish(null),120000);timer.unref?.();
-   const finish=rect=>{if(done)return;done=true;clearTimeout(timer);this.selection=null;resolve(rect);if(!window.isDestroyed())window.destroy();};
+   let done=false,settled=false,result=null,failure;
+   const settle=()=>{if(settled)return;settled=true;clearTimeout(timer);if(this.selection?.window===window)this.selection=null;failure?reject(failure):resolve(result);};
+   const finish=(rect,error)=>{if(done)return;done=true;result=rect;failure=error;clearTimeout(timer);if(this.selection?.window===window)this.selection.closing=true;
+    // Drop native capture/focus before destroying the fullscreen selector.
+    // Resume capture work only after Electron confirms HWND closure.
+    if(window.isDestroyed()){settle();return;}
+    window.setIgnoreMouseEvents?.(true);window.setFocusable?.(false);window.hide?.();window.destroy();
+   };
+   const timer=setTimeout(()=>finish(null),120000);timer.unref?.();
    this.selection={window,frame:{image:'data:image/jpeg;base64,'+image.toJPEG(92).toString('base64'),width:display.bounds.width,height:display.bounds.height,pixelWidth:image.getSize().width,pixelHeight:image.getSize().height,theme:this.getTheme()},finish};
-   window.on('closed',()=>finish(null));window.webContents.on('render-process-gone',()=>finish(null));
-   window.loadFile(path.join(__dirname,'../src/screenshot-select.html')).catch(error=>{if(!done){done=true;clearTimeout(timer);this.selection=null;reject(error);if(!window.isDestroyed())window.destroy();}});
+   window.on('closed',()=>{done=true;settle();});window.webContents.on('render-process-gone',()=>finish(null));
+   window.loadFile(path.join(__dirname,'../src/screenshot-select.html')).catch(error=>finish(null,error));
   });
  }
  async take(mode){
-  if(this.busy)return {ok:false,error:'Скриншот уже создаётся'};this.busy=true;this.canceled=false;this.error=null;this.publish();let restore;const config={...this.config};
+  if(this.busy)return {ok:false,error:'Скриншот уже создаётся'};this.busy=true;this.canceled=false;this.error=null;this.publish();let restore,selected=false;const config={...this.config};
   try{
    for(let n=config.countdown;n>0;n--){this.remaining=n;this.publish();await this.wait(1000);if(this.canceled)return {ok:true,canceled:true};}this.remaining=0;
    const display=config.monitor==='primary'?this.e.screen.getPrimaryDisplay():Number.isSafeInteger(config.monitor)?this.e.screen.getAllDisplays().find(x=>x.id===config.monitor):this.e.screen.getDisplayNearestPoint(this.e.screen.getCursorScreenPoint());if(!display)throw Error('Выбранный монитор отключён');
@@ -137,8 +144,8 @@ class DesktopTools{
    }
    if(this.canceled)return {ok:true,canceled:true};
    if(!image||image.isEmpty())throw Error('Не удалось получить изображение выбранного экрана');
-   restore?.();restore=null;
-   if(mode==='area'){const rect=await this.select(image,display);if(!rect)return {ok:true,canceled:true};image=image.crop(pixelCrop(rect,display.bounds,image.getSize()));}
+   if(mode!=='area'){restore?.();restore=null;}
+   if(mode==='area'){selected=true;const rect=await this.select(image,display);if(!rect)return {ok:true,canceled:true};image=image.crop(pixelCrop(rect,display.bounds,image.getSize()));}
    if(config.maxHeight&&image.getSize().height>config.maxHeight)image=image.resize({height:config.maxHeight,quality:'best'});
    const {width,height}=image.getSize(),id=randomUUID(),name='EclipseIsland-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+id.slice(0,6)+'.'+config.format,file=path.join(config.folder,name);
    const png=config.format==='png'?image.toPNG():null,encoded=png||image.toJPEG(config.quality);fs.mkdirSync(config.folder,{recursive:true});fs.writeFileSync(file,encoded,{flag:'wx'});
@@ -148,7 +155,7 @@ class DesktopTools{
    if(config.openAfter)this.preview(entry);
    return {ok:true,id,copied:config.copy&&!this.error,error:this.error};
   }catch(error){this.error=error.message;return {ok:false,error:error.message};}
-  finally{try{restore?.();}finally{this.busy=false;this.remaining=0;try{this.publish();}finally{try{this.restoreOverlay();}catch{}}}}
+  finally{try{restore?.();}finally{this.busy=false;this.remaining=0;try{this.publish();}finally{try{if(selected)await this.resetOverlay();else this.restoreOverlay();}catch{}}}}
  }
  close(){this.canceled=true;this.selection?.finish(null);for(const [window]of this.viewers)if(!window.isDestroyed())window.destroy();}
 }

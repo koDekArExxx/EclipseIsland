@@ -91,11 +91,38 @@ test('native screenshot failure restores surfaces and does not silently save a c
 });
 
 test('screenshot input is restored only after completion, including cancellation and capture failure',async()=>{
- const f=fixture();const states=[];f.tools.restoreOverlay=()=>states.push({busy:f.tools.busy,remaining:f.tools.remaining,selection:!!f.tools.selection});
+ const f=fixture();const states=[];f.tools.resetOverlay=f.tools.restoreOverlay=()=>states.push({busy:f.tools.busy,remaining:f.tools.remaining,selection:!!f.tools.selection});
  try{await f.tools.take('screen');f.tools.select=async()=>null;await f.tools.take('area');f.e.desktopCapturer.getSources=async()=>{throw Error('Capture failed');};await f.tools.take('screen');assert.equal(states.length,3);assert.ok(states.every(x=>!x.busy&&x.remaining===0&&!x.selection));}finally{f.close();}
 });
 
 test('input recovery still runs if the final screenshot notification fails',async()=>{
  const f=fixture();let restored=0;f.tools.restoreOverlay=()=>restored++;const publish=f.tools.publish.bind(f.tools);let calls=0;f.tools.publish=()=>{calls++;if(calls>1&&!f.tools.busy)throw Error('Renderer unavailable');publish();};
  try{await assert.rejects(()=>f.tools.take('screen'),/Renderer unavailable/);assert.equal(f.tools.busy,false);assert.equal(restored,1);}finally{f.close();}
+});
+
+
+test('area selector waits for native closed before restoring or replacing the island',async()=>{
+ const f=fixture();try{
+  const order=[];const Base=f.e.BrowserWindow;
+  class DelayedWindow extends Base{destroy(){order.push('destroy-request');}hide(){order.push('hide');}setFocusable(value){order.push(['focusable',value]);}setIgnoreMouseEvents(value){order.push(['ignore',value]);}}
+  f.e.BrowserWindow=DelayedWindow;f.tools.resetOverlay=()=>{assert.equal(f.tools.busy,false);assert.equal(f.tools.selection,null);order.push('replace');};
+  const pending=f.tools.take('area');await new Promise(r=>setImmediate(r));const w=f.tools.selection.window;
+  assert.equal(f.restored(),0,'keep island suspended throughout selection');
+  f.tools.selection.finish({x:0,y:0,width:100,height:100});await new Promise(r=>setImmediate(r));
+  assert.equal(f.tools.busy,true);assert.equal(f.tools.recent.length,0);assert.ok(!order.includes('replace'));
+  w.destroyed=true;w.emit('closed');assert.equal((await pending).ok,true);
+  assert.equal(order.at(-1),'replace');assert.equal(f.restored(),1);assert.equal(f.tools.recent.length,1);
+ }finally{f.close();}
+});
+
+test('canceled crop and failed selector load replace only the island after cleanup',async()=>{
+ for(const failed of [false,true]){
+  const f=fixture();try{let resets=0;f.tools.resetOverlay=()=>{assert.equal(f.tools.busy,false);assert.equal(f.tools.selection,null);resets++;};
+   if(failed)f.e.BrowserWindow.prototype.loadFile=()=>Promise.reject(Error('Selector load failed'));
+   const pending=f.tools.take('area');await new Promise(r=>setImmediate(r));
+   if(!failed)f.tools.selection.finish(null);
+   const result=await pending;assert.equal(resets,1);assert.equal(f.tools.recent.length,0);assert.equal(f.restored(),1);
+   if(failed)assert.equal(result.error,'Selector load failed');else assert.equal(result.canceled,true);
+  }finally{f.close();}
+ }
 });

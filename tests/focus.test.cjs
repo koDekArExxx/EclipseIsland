@@ -3,12 +3,12 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {EventEmitter}=require('node:events');
 test('island is nonactivating and media updates do not focus or show game-overlay windows',async()=>{
-  const windows=[],accelerators=new Map(),startedServices=[];let update,restoreFromPreview;
+  const windows=[],accelerators=new Map(),startedServices=[];let update,restoreFromPreview,resetFromSelection;
   // Exercise the Windows startup branch on every host without starting native services.
   const testProcess={...process,platform:'win32',env:{},argv:[process.execPath]};
   class Window extends EventEmitter{
     constructor(options){super();this.options=options;this.shows=0;this.focuses=0;this.visible=false;this.materials=[];this.shapes=[];this.messages=[];this.webContents=new EventEmitter();this.webContents.setWindowOpenHandler=()=>{};this.webContents.session={setPermissionRequestHandler:()=>{}};this.webContents.send=(_,value)=>this.messages.push(value);windows.push(this);}
-    isDestroyed(){return false;}isVisible(){return this.visible;}loadFile(file){this.file=file;}setPosition(){}getBounds(){return this.bounds||{x:0,y:0,width:this.options.width,height:this.options.height};}setBounds(bounds){this.bounds={...bounds};}setAlwaysOnTop(){}hide(){this.visible=false;this.emit('hide');}setShape(v){this.shapes.push(v);}setBackgroundMaterial(v){this.materials.push(v);}setIcon(v){this.icon=v;}setAppDetails(v){this.appDetails=v;}setFocusable(v){this.focusable=v;}setIgnoreMouseEvents(v){this.ignored=v;}setOpacity(v){this.opacity=v;}showInactive(){this.visible=true;this.shows++;this.emit('show');}show(){this.visible=true;this.shows++;this.emit('show');}focus(){this.focuses++;}
+    isDestroyed(){return !!this.destroyed;}destroy(){this.destroyed=true;this.visible=false;this.emit('closed');}setContentProtection(v){this.protected=v;}isVisible(){return this.visible;}loadFile(file){this.file=file;}setPosition(){}getBounds(){return this.bounds||{x:0,y:0,width:this.options.width,height:this.options.height};}setBounds(bounds){this.bounds={...bounds};}setAlwaysOnTop(){}hide(){this.visible=false;this.emit('hide');}setShape(v){this.shapes.push(v);}setBackgroundMaterial(v){this.materials.push(v);}setIcon(v){this.icon=v;}setAppDetails(v){this.appDetails=v;}setFocusable(v){this.focusable=v;}setIgnoreMouseEvents(v){this.ignored=v;}setOpacity(v){this.opacity=v;}showInactive(){this.visible=true;this.shows++;this.emit('show');}show(){this.visible=true;this.shows++;this.emit('show');}focus(){this.focuses++;}
   }
   class Tray extends EventEmitter{setToolTip(){}setContextMenu(){}}
   const flags=new Map([['disable-features','ExistingFeature']]);
@@ -35,6 +35,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
     if(name==='./downloads-monitor.cjs')return {DownloadsMonitor:class{
       setAyuFolder(){}snapshot(){return {items:[],recent:[],status:'ready'};}start(){}stop(){}
     }};
+    if(name==='./desktop-tools.cjs')return {DesktopTools:class extends require('../electron/desktop-tools.cjs').DesktopTools{constructor(...args){super(...args);resetFromSelection=args[3].resetOverlay;}}};
     if(name==='./weather.cjs')return {};
     if(name.startsWith('./'))return require(path.resolve(path.dirname(main),name));
     return require(name);
@@ -65,6 +66,11 @@ test('island is nonactivating and media updates do not focus or show game-overla
   assert.equal(typeof restoreFromPreview,'function');const shapeCount=overlay.shapes.length;overlay.ignored=true;const focusCount=overlay.focuses;
   restoreFromPreview();assert.equal(overlay.ignored,false);assert.ok(overlay.shapes.length>shapeCount);assert.equal(overlay.focuses,focusCount);
   hide();await new Promise(resolve=>setTimeout(resolve,230));const hiddenOpacity=overlay.opacity;restoreFromPreview();assert.equal(overlay.opacity,hiddenOpacity);assert.equal(overlay.ignored,true);
+  assert.equal(typeof resetFromSelection,'function');
+  resetFromSelection();assert.equal(overlay.destroyed,true);const replacement=windows.at(-1);replacement.emit('ready-to-show');
+  assert.equal(replacement.options.skipTaskbar,true);assert.equal(replacement.opacity,0,'manually hidden island remains hidden after replacement');assert.equal(replacement.focuses,0);
+  hide();assert.equal(replacement.opacity,1);assert.equal(replacement.ignored,false);update({available:true,title:'After crop',active:true});assert.equal(replacement.messages.at(-1).value.title,'After crop');
+  assert.deepEqual(startedServices,['capture','replay','transfers'],'replacing island does not restart services');
   windows.length=0;
   vm.runInNewContext(fs.readFileSync(main,'utf8'),{require:requireMock,__dirname:path.dirname(main),process:{...testProcess,argv:[process.execPath,'--autostart']},setInterval:()=>1,clearInterval:()=>{},setTimeout,console});
   await new Promise(resolve=>setImmediate(resolve));

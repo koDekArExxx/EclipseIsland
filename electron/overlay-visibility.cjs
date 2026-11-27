@@ -1,6 +1,7 @@
 // Never detach the nonactivating Chromium input surface through native hide/show.
 class OverlayVisibility{
  constructor(window,{beforeShow=()=>{},afterHide=()=>{},duration=200,setTimer=setTimeout,clearTimer=clearTimeout}={}){Object.assign(this,{window,beforeShow,afterHide,duration,setTimer,clearTimer});this.visible=null;this.generation=0;}
+ dispose(){this.generation++;this.clearTimer(this.timer);this.clearRepairs();}
  clearRepairs(){this.clearTimer(this.inputTimer);this.clearTimer(this.repairTimer);}
  inputReady(epoch){if(epoch===this.generation)this.clearRepairs();}
  resetInput(){if(!this.window.isDestroyed())this.window.webContents.send('state',{type:'input-reset',value:this.generation});}
