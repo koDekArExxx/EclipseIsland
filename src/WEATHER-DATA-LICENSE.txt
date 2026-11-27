@@ -1,0 +1,11 @@
+Russian city coordinate/name dataset: HFLabs / DaData.
+Source: https://github.com/hflabs/city (city.csv)
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+Adaptation: extracted names, regions, latitude and longitude; sorted entries for local city search.
+Original city.csv SHA-256: aefd11fd133881c348e0138b273a300ec6b3909c8f61d8d1d5ffc5e85021ec0d
+The adapted dataset russian-cities.js remains under CC BY-SA 4.0. Application code retains its own license.
+
+Weather source: wttr.in, https://wttr.in/ , https://github.com/chubin/wttr.in
+Day/night icon uses an approximate solar elevation calculation from NOAA:
+https://gml.noaa.gov/grad/solcalc/solareqns.PDF

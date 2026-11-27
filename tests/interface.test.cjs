@@ -399,3 +399,10 @@ test('switching island panels preserves compact cover, navigation and focus; rep
  tabs.querySelector('[data-island-tab="capture"]').click();f.emit('capture',{active:true,status:'recording',elapsed:1,settings:{},recent:[]});assert.equal(d.querySelector('.island-tabs'),tabs);assert.equal(d.querySelector('[data-expand]'),compact);
  }finally{f.dom.window.close();}
 });
+
+test('weather source, stale marker and untrusted descriptions render safely on the island',async()=>{
+ const f=await fixture(true);try{const d=f.document;d.querySelector('[data-expand]').click();d.querySelector('[data-island-tab="weather"]').click();
+ f.emit('weather',{status:'ready',city:'Москва',temperature:-3,feels:-9,code:71,isDay:true,wind:5,source:'wttr.in',description:'<img src=x onerror=alert(1)>',stale:true,updatedAt:1000});
+ assert.match(d.querySelector('.island-weather').textContent,/wttr\.in/);assert.match(d.querySelector('.island-weather').textContent,/Сохранённые данные/);assert.match(d.querySelector('.island-weather').textContent,/<img/);assert.equal(d.querySelector('.island-weather img'),null);
+ }finally{f.dom.window.close();}
+});

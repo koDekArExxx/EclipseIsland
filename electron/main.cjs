@@ -15,7 +15,7 @@ app.on('browser-window-created',(_event,window)=>applyAppIdentity(window));
 const { sanitize, migrateLegacySettings } = require('./settings.cjs');
 const { configureAutostart } = require('./autostart.cjs');
 const { refreshLauncher } = require('./launcher-update.cjs');
-const { searchCities, getWeather } = require('./weather.cjs');
+const { searchCities, getWeather, useWeatherFetch } = require('./weather.cjs');
 const { MediaHub } = require('./media-hub.cjs');
 const { registerMediaShortcuts } = require('./media-shortcuts.cjs');
 const { CaptureController } = require('./capture.cjs');
@@ -106,7 +106,7 @@ function restoreOverlayInteraction(){
 }
 function configureWindow(window) {
   applyAppIdentity(window);
-  window.webContents.setWindowOpenHandler(({url}) => {if(url==='https://open-meteo.com/')shell.openExternal(url);return {action:'deny'};});
+  window.webContents.setWindowOpenHandler(({url}) => {if(['https://wttr.in/','https://github.com/hflabs/city'].includes(url))shell.openExternal(url);return {action:'deny'};});
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_,__,callback)=>callback(false));
   const visible=()=>{if(!window.isDestroyed()&&!window.isMinimized?.())syncView(window);};
@@ -133,12 +133,12 @@ function createOverlay() {
   overlay.once('ready-to-show',()=>{overlay.setFocusable(false);applyMaterials();positionOverlay();});
   // Native clipping supplies hit-testing too; no global mouse polling is needed.
 }
-async function refreshWeather() {
+async function refreshWeather(force=false) {
   const generation=++weatherGeneration;
   if(!settings.city){weather={status:'empty'};broadcast('weather',weather);return weather;}
   const city=settings.city;
   weather={...weather,status:'loading'};broadcast('weather',weather);
-  try {const result=await getWeather(city);if(generation!==weatherGeneration)return weather;weather={status:'ready',...result};}
+  try {const result=await getWeather(city,{force});if(generation!==weatherGeneration)return weather;weather={status:'ready',...result};}
   catch(error){if(generation!==weatherGeneration)return weather;weather={...weather,status:'error',error:error.message};}
   broadcast('weather',weather);return weather;
 }
@@ -174,7 +174,7 @@ function registerIPC() {
     const previous=settings;settings=next;try{saveSettings();}catch{settings=previous;throw new Error('Не удалось сохранить город');}
     weather={status:'empty'};broadcast('settings',settings);return refreshWeather();
   });
-  handle('weather:refresh',refreshWeather);
+  handle('weather:refresh',()=>refreshWeather(true));
   handle('media:command',(action,seconds)=>media.command(action,seconds));
   handle('capture:action',recordAction);
   handle('capture:sources',()=>capture?capture.sources():[]);
@@ -235,6 +235,7 @@ if(!app.requestSingleInstanceLock()){
   app.on('second-instance',(_event,argv=[])=>{if(app.isReady()&&!argv.includes('--autostart'))createDashboard();});
   app.whenReady().then(()=>{
     app.setAppUserModelId('app.eclipseisland.desktop');
+    if(net?.fetch)useWeatherFetch?.((url,options)=>net.fetch(url,options));
     refreshLauncher(app).catch(error=>console.error('Launcher update',error.code||error.message));
     settingsPath=path.join(app.getPath('userData'),'settings.json');
     try{settings=sanitize(JSON.parse(fs.readFileSync(settingsPath,'utf8')));}catch{

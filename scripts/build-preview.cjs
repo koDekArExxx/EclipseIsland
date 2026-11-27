@@ -1,7 +1,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const root=path.resolve(__dirname,'../src');
-const js=['icons.js','model.js','browser-api.js','audio.js','controls.js','app.js'].map(name=>
+const js=['icons.js','model.js','russian-cities.js','weather-client.js','browser-api.js','audio.js','controls.js','app.js'].map(name=>
   fs.readFileSync(path.join(root,name),'utf8').replace(/^import .*;\s*$/gm,'').replace(/^export /gm,'')+
   (name==='model.js'?'\nconst esc=escapeHTML;const escape=escapeHTML;':'')
 ).join('\n');

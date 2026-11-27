@@ -340,3 +340,5 @@ html[data-performance=eco] .island .panel-enter{animation-duration:.16s}
 html.reduced-motion .island .panel-enter{animation:none!important}
 .island-tabs>button{transition:background-color .16s ease,color .16s ease,transform .16s ease}
 .island-tabs>button:active{transform:scale(.95)}
+
+.island-weather-source{font-size:9px!important;opacity:.75;margin-top:10px!important}
