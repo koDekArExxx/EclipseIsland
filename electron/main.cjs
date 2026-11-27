@@ -30,12 +30,7 @@ const { readToken } = require('./spotify-direct.cjs');
 const { SpotifySetup } = require('./spotify-setup.cjs');
 const { MediaDelivery } = require('./media-delivery.cjs');
 const delivery=new MediaDelivery();
-// A visible desktop widget must keep processing updates while another app has focus.
-if(app.commandLine){
-  for(const flag of ['disable-background-timer-throttling','disable-renderer-backgrounding','disable-backgrounding-occluded-windows'])app.commandLine.appendSwitch(flag);
-  const disabled=app.commandLine.getSwitchValue('disable-features').split(',').filter(Boolean);
-  app.commandLine.appendSwitch('disable-features',[...new Set([...disabled,'CalculateNativeWinOcclusion'])].join(','));
-}
+// Only the island and recorder opt out of background throttling. Hidden settings sleep.
 const { clipDashboard, overlayShape } = require('./window-style.cjs');
 const nativeBlur = false; // Use one CSS compositor; mixing DWM Acrylic and backdrop-filter caused flashes.
 app.setName('EclipseIsland');
@@ -56,7 +51,7 @@ let overlayProtection=false,protectionOverrides=0;
 function applyOverlayProtection(value){overlayProtection=!!value;if(overlay&&!overlay.isDestroyed())overlay.setContentProtection(protectionOverrides?false:overlayProtection);}
 let lastShape='', shapeAvailable=true, fallbackHitTimer;
 const trusted = event => [dashboard,overlay].some(w => w && !w.isDestroyed() && w.webContents === event.sender);
-function broadcast(type, value) {for(const w of [dashboard,overlay]) if(w && !w.isDestroyed() && (!['media','capture','transfers','replay'].includes(type)||(w.isVisible()&&(w!==overlay||settings?.enabled)))){const sequence=type==='media'&&('title' in value||'artwork' in value||'active' in value)?delivery.sent(w.webContents.id):undefined;w.webContents.send('state',{type,value,sequence});}}
+function broadcast(type, value) {for(const w of [dashboard,overlay]) if(w && !w.isDestroyed() && (!['media','capture','transfers','replay','tools','downloads','weather'].includes(type)||(w.isVisible()&&!w.isMinimized?.()&&(w!==overlay||settings?.enabled)))){const sequence=type==='media'&&('title' in value||'artwork' in value||'active' in value)?delivery.sent(w.webContents.id):undefined;w.webContents.send('state',{type,value,sequence});}}
 function completionSound(kind){
   if(!settings?.[kind+'Sound']||!settings.completionVolume)return;
   const target=[overlay,dashboard].find(w=>w&&!w.isDestroyed()&&!w.webContents.isLoading());
@@ -114,7 +109,7 @@ function configureWindow(window) {
 }
 function createDashboard() {
   if(dashboard && !dashboard.isDestroyed()){dashboard.show();dashboard.focus();return;}
-  dashboard=new BrowserWindow({width:1180,height:830,minWidth:940,minHeight:720,frame:false,transparent:true,resizable:false,hasShadow:false,backgroundColor:'#00000000',show:false,icon:process.platform==='win32'?appIconPath:path.join(__dirname,'../src/eclipse-logo.png'),title:'EclipseIsland — Настройки',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
+  dashboard=new BrowserWindow({width:1180,height:830,minWidth:940,minHeight:720,frame:false,transparent:true,resizable:false,hasShadow:false,backgroundColor:'#00000000',show:false,icon:process.platform==='win32'?appIconPath:path.join(__dirname,'../src/eclipse-logo.png'),title:'EclipseIsland — Настройки',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:true,autoplayPolicy:'no-user-gesture-required'}});
   configureWindow(dashboard);
   clipDashboard(dashboard,settings);
   dashboard.on('resize',()=>clipDashboard(dashboard,settings));

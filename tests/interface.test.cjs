@@ -378,3 +378,14 @@ test('legacy FPS setting cannot restore the removed counter or its toggle',async
   assert.doesNotMatch(f.document.body.textContent,/\bFPS\b/);
  }finally{f.dom.window.close();}
 });
+
+test('performance mode and capture presets persist real settings',async()=>{
+ const f=await fixture();try{
+  const mode=f.document.querySelector('[data-setting="performanceMode"]');assert.ok(mode);
+  mode.value='eco';mode.dispatchEvent(new f.w.Event('change',{bubbles:true}));await sleep(10);
+  assert.equal(f.saved().performanceMode,'eco');assert.equal(f.document.documentElement.dataset.performance,'eco');
+  f.document.querySelector('.sidebar [data-nav="capture"]').click();
+  f.document.querySelector('[data-capture-profile="eco"]').click();await sleep(10);
+  assert.equal(f.captureSaves.at(-1).fps,30);assert.equal(f.captureSaves.at(-1).height,720);assert.equal(f.captureSaves.at(-1).quality,'auto');
+ }finally{f.dom.window.close();}
+});

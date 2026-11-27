@@ -1,6 +1,6 @@
 const defaults = Object.freeze({
   ...{"advancedTheme":false,"separateIslandAccent":false,"sidebarColor":"#181322","cardColor":"#201a2b","mutedColor":"#a49aaf","lineColor":"#393145","islandSurface":"#120d1d","islandGradient":"#211831","islandText":"#f0ebfa","islandMuted":"#b2a7c0","islandAccent":"#bda2ff","islandBorder":"#665680","glowColor":"#bda2ff","shadowColor":"#000000","buttonColor":"#bda2ff","buttonText":"#21162f","gradientEnabled":true,"gradientAngle":145,"islandOpacity":100,"borderOpacity":45,"borderWidth":1,"shadowStrength":30,"shadowBlur":22,"compactRadius":30,"cardRadius":12},
-  enabled: true, topmost: true, hoverExpand: true, sounds: true, reducedMotion: false, autoLaunch: true,
+  performanceMode: 'balanced', enabled: true, topmost: true, hoverExpand: true, sounds: true, reducedMotion: false, autoLaunch: true,
   showSeconds: false, hour12: false, showWeather: true, showMusic: true,  showDownloads:true, downloadSound:true, transferSound:true, completionVolume:45, downloadTone:'soft', transferTone:'chime', transferReplacementVersion:1,showTransfers:true,replaceTransferWindow:true,transferDetails:true,
   
   ayuDownloadFolder: null,
@@ -19,6 +19,7 @@ function sanitize(input = {}) {
     if (Number.isFinite(input[key])) out[key] = Math.round(Math.min(max, Math.max(min, input[key])));
   }
   for(const key of ['downloadTone','transferTone'])if(['soft','chime','digital'].includes(input[key]))out[key]=input[key];
+  if(['balanced','eco','quality'].includes(input.performanceMode))out.performanceMode=input.performanceMode;
   if (['mint', 'violet', 'blue', 'peach', 'rose', 'amber', 'custom'].includes(input.accent)) out.accent = input.accent;
   if(typeof input.mediaSource==='string'&&input.mediaSource.length>0&&input.mediaSource.length<=200&&!/[\x00-\x1f]/.test(input.mediaSource))out.mediaSource=input.mediaSource;
   for (const key of ['uiRenderer','islandRenderer','loaderRenderer']) if (['modern','liquid','frosted'].includes(input[key])) out[key] = input[key];

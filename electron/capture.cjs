@@ -90,7 +90,7 @@ class CaptureController{
    if(entry){
     this.state={...this.state,status:'exporting',exportProgress:0};this.publish();
     try{
-     const file=await this.exportMP4(entry,current.config,(progress,mode)=>{const rounded=Math.floor(progress);if(rounded!==this.state.exportProgress||mode!==this.state.exportMode){this.state.exportProgress=rounded;this.state.exportMode=mode;this.publish();}});
+     const file=await this.exportMP4(entry,{...current.config,bitrate:this.state.videoBitrate?this.state.videoBitrate/1000000:current.config.bitrate},(progress,mode)=>{const rounded=Math.floor(progress);if(rounded!==this.state.exportProgress||mode!==this.state.exportMode){this.state.exportProgress=rounded;this.state.exportMode=mode;this.publish();}});
      entry=await this.store.replaceWithMP4(entry,file);
     }catch(failure){error=(error?error+' · ':'')+'MP4 не сохранён. Исходное видео оставлено в папке. '+failure.message;}
    }

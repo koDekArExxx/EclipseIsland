@@ -42,7 +42,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
   vm.runInNewContext(fs.readFileSync(main,'utf8'),{require:requireMock,__dirname:path.dirname(main),process:testProcess,setInterval:()=>1,clearInterval:()=>{},setTimeout,console});
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(startedServices,['capture','replay','transfers'],'Windows services are isolated while their startup branch is exercised');
-  assert.ok(flags.has('disable-background-timer-throttling'));assert.ok(flags.has('disable-renderer-backgrounding'));assert.ok(flags.get('disable-features').includes('ExistingFeature'));assert.ok(flags.get('disable-features').includes('CalculateNativeWinOcclusion'));
+  assert.equal(flags.has('disable-background-timer-throttling'),false);assert.equal(flags.has('disable-renderer-backgrounding'),false);assert.equal(flags.get('disable-features'),'ExistingFeature');
   const overlay=windows.find(w=>w.options.skipTaskbar);assert.ok(overlay);assert.equal(overlay.options.focusable,false);assert.equal(overlay.options.webPreferences.focusOnNavigation,false);
   overlay.emit('ready-to-show');assert.equal(overlay.focusable,false);const shows=overlay.shows;
   update({available:true,active:true,title:'Track',playing:true});assert.equal(overlay.shows,shows);assert.equal(overlay.focuses,0);
@@ -54,7 +54,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
 
   const dashboard=windows.find(w=>!w.options.skipTaskbar);assert.equal(dashboard.messages.some(m=>m.type==='media'),false,'hidden settings receive no media ticks');
   dashboard.webContents.emit('dom-ready');assert.equal(dashboard.visible,true,'HTML loader is shown without waiting for media or ready-to-show');
-  assert.equal(dashboard.options.webPreferences.backgroundThrottling,false);
+  assert.equal(dashboard.options.webPreferences.backgroundThrottling,true);
   assert.match(dashboard.icon,/eclipse\.ico$/);assert.equal(dashboard.appDetails.appId,'app.eclipseisland.desktop');assert.equal(dashboard.appDetails.appIconPath,dashboard.icon);
   dashboard.visible=false;dashboard.emit('minimize');
   update({available:true,active:true,trackKey:'restored-track',title:'Changed while minimized',playing:true});

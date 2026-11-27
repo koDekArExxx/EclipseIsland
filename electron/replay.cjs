@@ -3,7 +3,7 @@ const {CaptureStore}=require('./capture-store.cjs');
 const {exportMP4,verifyEncoder}=require('./mp4-export.cjs');
 function replayConfig(settings){
  const pick=(key,base,fallback)=>settings[key]??settings[base]??fallback;
- return {mode:'replay',height:settings.replayHeight,fps:settings.replayFPS,bitrate:settings.replayBitrate,codec:'auto',countdown:0,maxMinutes:0,maxSizeMB:0,source:settings.source||'',excludeIsland:settings.excludeIsland,
+ return {mode:'replay',quality:settings.replayQuality||'auto',height:settings.replayHeight,fps:settings.replayFPS,bitrate:settings.replayBitrate,codec:'auto',countdown:0,maxMinutes:0,maxSizeMB:0,source:settings.source||'',excludeIsland:settings.excludeIsland,
  microphone:pick('replayMicrophone','microphone',false),noiseSuppression:pick('replayNoiseSuppression','noiseSuppression',true),echoCancellation:pick('replayEchoCancellation','echoCancellation',true),autoGainControl:pick('replayAutoGainControl','autoGainControl',false),micHighPass:!!settings.replayMicHighPass,micCompressor:!!settings.replayMicCompressor,
  systemAudio:pick('replaySystemAudio','systemAudio',true),systemVolume:pick('replaySystemVolume','systemVolume',100),micVolume:pick('replayMicVolume','micVolume',100),audioBitrate:pick('replayAudioBitrate','audioBitrate',192)};
 }
@@ -17,7 +17,7 @@ class ReplayController{
   ipc.handle('replay-worker:chunk',async(event,bytes)=>{if(!trusted(event)||!this.current)throw Error('Replay closed');const current=this.current;this.writes=this.writes.then(()=>this.store.append(current,bytes));await this.writes;if(this.settings.replayMaxMB>0&&current.bytes>this.settings.replayMaxMB*1048576/2)this.window?.webContents.send('replay-worker:command','rotate');return {ok:true};});
   ipc.handle('replay-worker:segment',async(event,value)=>{if(!trusted(event))throw Error('Replay closed');this.rotating=this.rotate(value);try{await this.rotating;}finally{this.rotating=null;}return {ok:true};});
   ipc.handle('replay-worker:finish',async(event,value)=>{if(!trusted(event))throw Error('Replay closed');await this.finish(value);return {ok:true};});
-  ipc.on('replay-worker:state',(event,value)=>{if(!trusted(event))return;if(value.status==='recording'){clearTimeout(this.startTimer);this.state={...this.state,status:'buffering',codec:value.codec,capturePath:value.capturePath,sourceFPS:value.sourceFPS,warnings:Array.isArray(value.warnings)?value.warnings:[]};this.publish();}});
+  ipc.on('replay-worker:state',(event,value)=>{if(!trusted(event))return;if(value.status==='recording'){clearTimeout(this.startTimer);this.state={...this.state,status:'buffering',codec:value.codec,capturePath:value.capturePath,sourceFPS:value.sourceFPS,videoBitrate:value.videoBitrate,encodingEfficiency:value.encodingEfficiency,warnings:Array.isArray(value.warnings)?value.warnings:[]};this.publish();}});
  }
  snapshot(){return {...this.state,active:!!this.window,saving:!!this.saving||!!this.saveRequested};}
  publish(patch={}){this.state={...this.state,...patch};this.onUpdate(this.snapshot());}
@@ -63,7 +63,7 @@ class ReplayController{
    const concatFile=path.join(this.root,'replay-'+id+'.ffconcat');const escape=value=>value.replace(/'/g,"'\\''");await fs.writeFile(concatFile,'ffconcat version 1.0\n'+selected.map(x=>"file '"+escape(x.file.replace(/\\/g,'/'))+"'").join('\n')+'\n');
    const duration=Math.min(seconds,this.settings.replaySeconds),entry={id,file,duration,concatFile,startOffset:Math.max(0,seconds-duration),videoCodec:selected.every(x=>x.videoCodec==='h264')?'h264':'other',audioCodec:selected[0].audioCodec};
    try{
-    const output=await this.exportMP4(entry,{...this.settings,bitrate:this.settings.replayBitrate,audioBitrate:this.config.audioBitrate},progress=>this.publish({saveProgress:Math.floor(progress)}));const stat=await fs.stat(output);
+    const output=await this.exportMP4(entry,{...this.settings,bitrate:this.state.videoBitrate?this.state.videoBitrate/1000000:this.settings.replayBitrate,audioBitrate:this.config.audioBitrate},progress=>this.publish({saveProgress:Math.floor(progress)}));const stat=await fs.stat(output);
     await this.videoStore.importVideo({id,file:output,name:path.basename(output),duration,bytes:stat.size,createdAt,format:'mp4',replay:true,indexedDuration:true});this.publish({lastSaved:id,error:null});
    }finally{await fs.unlink(concatFile).catch(()=>{});for(const item of selected)item.locked=false;}
   };

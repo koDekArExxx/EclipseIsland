@@ -5,7 +5,7 @@
  const elapsed=()=>started!==null?Math.max(0,((pausedAt??performance.now())-started-pausedMS)/1000):0;
  function cleanup(){clearTimeout(segmentTimer);clearInterval(metrics);clearInterval(draw);if(videoFrame!==undefined)video.cancelVideoFrameCallback?.(videoFrame);for(const stream of streams)for(const track of stream.getTracks())track.stop();video.srcObject=null;audio?.close().catch(()=>{});}
  async function finish(error){if(finished)return;finished=true;cleanup();try{await queue;}catch(e){error=error||e.message;}await api.finish({duration:elapsed(),error:error||null});}
- async function stop(error){if(stopping)return;stopping=true;cancelled=true;clearTimeout(segmentTimer);if(rotation){await rotation.catch(()=>{});await finish(error);return;}if(recorder&&recorder.state!=='inactive'){recorder.addEventListener('stop',()=>finish(error),{once:true});recorder.stop();}else await finish(error);}
+ async function stop(error){if(stopping)return;stopping=true;cancelled=true;clearTimeout(segmentTimer);if(rotation)await rotation.catch(()=>{});if(recorder&&recorder.state!=='inactive'){recorder.addEventListener('stop',()=>finish(error),{once:true});recorder.stop();}else await finish(error);}
  api.on(command=>{
   if(command==='stop')stop();
   if(command==='snapshot'&&config?.mode==='replay')rotate(true);
@@ -27,7 +27,7 @@
   }
   streams.push(screen);
   if(cancelled){cleanup();return;}
-  const screenTrack=screen.getVideoTracks()[0];screenTrack.addEventListener('ended',()=>stop());
+  const screenTrack=screen.getVideoTracks()[0];screenTrack.contentHint='motion';screenTrack.addEventListener('ended',()=>stop());
   let sourceSettings=screenTrack.getSettings();
   if(!sourceSettings.width||!sourceSettings.height){video.srcObject=screen;await video.play();sourceSettings={...sourceSettings,width:video.videoWidth||1920,height:video.videoHeight||1080};}
   const height=Math.max(2,Math.floor(Math.min(config.height,sourceSettings.height)/2)*2),width=Math.max(2,Math.round(height*sourceSettings.width/sourceSettings.height/2)*2);
@@ -40,7 +40,7 @@
   }else{
    capturePath='resize';video.srcObject=screen;await video.play();canvas.width=width;canvas.height=height;outputWidth=width;outputHeight=height;
    const ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
-   const paint=()=>{if(!stopping&&recorder?.state!=='paused')ctx.drawImage(video,0,0,width,height);};paint();
+   let lastPaint=-Infinity;const paint=()=>{const now=performance.now();if(!stopping&&recorder?.state!=='paused'&&now-lastPaint>=1000/config.fps-.5){ctx.drawImage(video,0,0,width,height);lastPaint=now;}};paint();
    output=canvas.captureStream(config.fps);
    if(video.requestVideoFrameCallback){const next=()=>{paint();if(!stopping)videoFrame=video.requestVideoFrameCallback(next);};videoFrame=video.requestVideoFrameCallback(next);}
    else draw=setInterval(paint,1000/Math.min(config.fps,actual.frameRate||sourceSettings.frameRate||60));
@@ -54,12 +54,14 @@
   const hasAudio=!!output.getAudioTracks().length,audioSuffix=hasAudio?',opus':'';
   const h264=['video/mp4;codecs=avc1'+(hasAudio?',mp4a.40.2':''),'video/mp4;codecs=avc1'+audioSuffix,'video/webm;codecs=h264'+audioSuffix];
   const candidates=config.codec==='vp8'?['video/webm;codecs=vp8'+audioSuffix]:config.codec==='vp9'?['video/webm;codecs=vp9'+audioSuffix]:config.codec==='h264'?h264:[...h264,'video/webm;codecs=vp8'+audioSuffix,'video/webm;codecs=vp9'+audioSuffix,'video/webm'];
-  let mimeType;
-  for(const candidate of candidates){if(!MediaRecorder.isTypeSupported(candidate))continue;try{recorder=new MediaRecorder(output,{mimeType:candidate,videoBitsPerSecond:config.bitrate*1000000,audioBitsPerSecond:config.audioBitrate*1000,videoKeyFrameIntervalDuration:1000});mimeType=recorder.mimeType||candidate;break;}catch{}}
+  const effectiveFPS=Math.min(config.fps,actual.frameRate||config.fps),videoBitrate=window.capturePolicy.bitrate(config,outputWidth,outputHeight,effectiveFPS);
+  const ranked=await window.capturePolicy.codecs(candidates.filter(m=>MediaRecorder.isTypeSupported(m)),navigator.mediaCapabilities,{width:outputWidth,height:outputHeight,framerate:effectiveFPS,bitrate:videoBitrate});
+  let mimeType,encodingEfficiency='unknown';
+  for(const option of ranked){const candidate=option.mimeType;try{recorder=new MediaRecorder(output,{mimeType:candidate,videoBitsPerSecond:videoBitrate,audioBitsPerSecond:config.audioBitrate*1000,videoKeyFrameIntervalDuration:1000});mimeType=recorder.mimeType||candidate;encodingEfficiency=option.info?option.info.powerEfficient?'efficient':'software':'unknown';break;}catch{}}
   if(!recorder)throw Error('Выбранный кодек недоступен. Выберите Авто или VP8');
   if(api.format)await api.format({mimeType});
   if(cancelled){cleanup();return;}
-  outputStream=output;recorderOptions={mimeType,videoBitsPerSecond:config.bitrate*1000000,audioBitsPerSecond:config.audioBitrate*1000,videoKeyFrameIntervalDuration:1000};
+  outputStream=output;recorderOptions={mimeType,videoBitsPerSecond:videoBitrate,audioBitsPerSecond:config.audioBitrate*1000,videoKeyFrameIntervalDuration:1000};
   function bind(instance){
   instance.addEventListener('dataavailable',event=>{
    if(!event.data.size)return;queued+=event.data.size;
@@ -73,19 +75,22 @@
    saveRequested=saveRequested||save;if(rotation||stopping)return rotation;
    clearTimeout(segmentTimer);
    rotation=new Promise((resolve,reject)=>{
-    recorder.addEventListener('stop',async()=>{try{
-     await queue;const save=saveRequested;saveRequested=false;
-     await api.segment({duration:Math.max(0,(performance.now()-segmentStarted)/1000),save});
+    recorder.addEventListener('stop',()=>{try{
+     const duration=Math.max(0,(performance.now()-segmentStarted)/1000),save=saveRequested;saveRequested=false;
+     // Gate the next segment's writes behind finalizing the old file, but restart
+     // capture immediately. Slow disk/index operations no longer stop acquisition.
+     queue=queue.then(()=>api.segment({duration,save}));const boundary=queue;
      if(!stopping){recorder=new MediaRecorder(outputStream,recorderOptions);bind(recorder);segmentStarted=performance.now();recorder.start(1000);}
-     resolve();
-    }catch(error){reject(error);}},{once:true});recorder.stop();
+     boundary.then(resolve,reject);
+    }catch(error){reject(error);}
+   },{once:true});recorder.stop();
    });
    rotation.then(()=>{rotation=null;if(!stopping)segmentTimer=setTimeout(()=>rotate(false),saveRequested?0:5000);},error=>{rotation=null;stop(error.message||'Ошибка буфера повтора');});return rotation;
   };
   bind(recorder);
   started=performance.now();segmentStarted=started;recorder.start(1000);if(config.mode==='replay')segmentTimer=setTimeout(()=>rotate(false),5000);
   const sourceFPS=screenTrack.getSettings().frameRate||null;
-  api.report({status:'recording',elapsed:0,width:outputWidth,height:outputHeight,targetFPS:config.fps,sourceFPS,codec:mimeType,capturePath,warnings});
+  api.report({status:'recording',elapsed:0,width:outputWidth,height:outputHeight,targetFPS:config.fps,sourceFPS,codec:mimeType,capturePath,encodingEfficiency,videoBitrate,effectiveFPS,warnings});
   metrics=setInterval(()=>{if(stopping)return;api.report({status:recorder.state==='paused'?'paused':'recording',elapsed:elapsed()});if(config.maxMinutes&&elapsed()>=config.maxMinutes*60)stop();},500);
  }catch(error){const reason={NotAllowedError:'Запись не началась: доступ к экрану или микрофону отклонён',NotReadableError:'Источник захвата недоступен. Выберите экран или другое окно',NotFoundError:'Не найден выбранный экран или микрофон',OverconstrainedError:'Источник не поддерживает выбранные параметры. Уменьшите разрешение или FPS'}[error.name];await stop(reason||error.message||'Не удалось начать запись');}
 })();

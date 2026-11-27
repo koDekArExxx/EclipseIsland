@@ -318,3 +318,16 @@ html.dashboard-document .app-shell{background-clip:padding-box;transform:transla
 /* Keep the About mark bounded independently of SVG percentage sizing. */
 .about-logo{width:64px;height:64px;max-width:64px;max-height:64px;margin:0 auto;overflow:hidden}
 .about-logo>.icon{width:48px;height:48px;max-width:100%;max-height:100%;filter:none}
+
+/* 1.0.2: keep static UI static. Hidden cover decoration must not animate beneath artwork. */
+.has-artwork>.vinyl{animation:none!important}
+html[data-performance=balanced] .island:not(.expanded):not(:hover) .equalizer>i{animation-play-state:paused!important}
+html[data-performance=eco] .island *,html[data-performance=eco] .island *::before,html[data-performance=eco] .island *::after{animation:none!important;will-change:auto!important}
+html[data-performance=eco] .island,html[data-performance=eco] .island *,html[data-performance=eco] .island::before,html[data-performance=eco] .island::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;box-shadow:none!important}
+html[data-performance=eco] .island{transition-duration:.18s!important}
+html[data-performance=eco] .island .island-expanded{transition-duration:.16s!important}
+.capture-presets{display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
+.capture-presets button{flex:1;min-width:130px;border:1px solid rgba(var(--accent-rgb),.22);background:rgba(var(--accent-rgb),.06);border-radius:12px;padding:13px 12px;text-align:left}
+.capture-presets button strong,.capture-presets button small{display:block}.capture-presets button strong{color:var(--text);font-size:12px}.capture-presets button small{color:var(--muted);font-size:10px;margin-top:5px}.capture-presets button:hover{border-color:var(--accent)}.capture-presets button:disabled{opacity:.4}
+
+.capture-presets button[aria-pressed=true]{border-color:var(--accent);background:rgba(var(--accent-rgb),.15)}
