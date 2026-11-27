@@ -61,6 +61,9 @@ const completionNotices=new CompletionNotices(completionSound);
 function saveSettings() {const tmp=settingsPath+'.tmp';fs.writeFileSync(tmp,JSON.stringify(settings,null,2));fs.renameSync(tmp,settingsPath);}
 function positionOverlay() {
   if(!overlay || overlay.isDestroyed())return;
+  // Returning from user Hide must not reuse a native surface that ignored mouse
+  // events. Screenshot suspension owns its separate release lifecycle.
+  if(settings.enabled&&overlayVisibility?.visible===false&&!overlayVisibility.suspended){resetOverlayAfterSelection();return;}
   const displays = screen.getAllDisplays();
   const display = displays.find(d=>d.id === settings.monitor) || screen.getPrimaryDisplay();
   const {x,y,width,height}=display.bounds;
@@ -107,7 +110,7 @@ function restoreOverlayInteraction(){
 function resetOverlayAfterSelection(){
  if(quitting)return;
  // A fresh native input surface avoids reusing Chromium's stale mouse routing
- // after a fullscreen selector owned OS capture. Keep every service running.
+ // after Hide or a fullscreen selector owned OS capture. Keep services running.
  const previous=overlay;overlayVisibility?.dispose();overlayVisibility=null;
  overlayHeartbeat=0;overlayTransferIds=[];transfers?.lease(false);
  if(previous){delivery.views.delete(previous.webContents.id);if(!previous.isDestroyed())previous.destroy();}
@@ -140,7 +143,7 @@ function createOverlay() {
   configureWindow(overlay);
   clipOverlay();
   overlay.loadFile(path.join(__dirname,'../src/overlay.html'),{query:{view:'overlay'}});
-  overlay.once('ready-to-show',()=>{overlay.setFocusable(false);applyMaterials();positionOverlay();});
+  const window=overlay;window.once('ready-to-show',()=>{if(window!==overlay||window.isDestroyed())return;window.setFocusable(false);applyMaterials();positionOverlay();});
   // Native clipping supplies hit-testing too; no global mouse polling is needed.
 }
 async function refreshWeather(force=false) {
