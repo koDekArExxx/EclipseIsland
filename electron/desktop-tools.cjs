@@ -1,4 +1,4 @@
-const {setupPreview,clipPreview}=require('./window-style.cjs');
+const {backgroundWindowOptions,setupPreview,clipPreview}=require('./window-style.cjs');
 const fs=require('node:fs');
 const path=require('node:path');
 const os=require('node:os');
@@ -113,7 +113,7 @@ class DesktopTools{
   else throw Error('Неизвестное действие');return {ok:true};
  }
  async select(image,display){
-  const window=new this.e.BrowserWindow({...display.bounds,frame:false,resizable:false,movable:false,skipTaskbar:true,alwaysOnTop:true,show:false,backgroundColor:'#111018',title:'EclipseIsland — Выделите область',webPreferences:{preload:path.join(__dirname,'screenshot-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  const window=new this.e.BrowserWindow({...backgroundWindowOptions(process.platform,{keyboard:true}),...display.bounds,frame:false,resizable:false,movable:false,skipTaskbar:true,alwaysOnTop:true,show:false,backgroundColor:'#111018',title:'EclipseIsland — Выделите область',webPreferences:{preload:path.join(__dirname,'screenshot-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window.setAlwaysOnTop(true,'screen-saver');window.setMenuBarVisibility(false);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());
   return new Promise((resolve,reject)=>{
    let done=false,settled=false,result=null,failure;

@@ -1,3 +1,9 @@
+// On Windows skipTaskbar alone is not a tool-window classification. Use the
+// native toolbar type for utility surfaces so they never become Alt+Tab targets.
+// Selectors still need keyboard focus for Escape; capture workers do not.
+function backgroundWindowOptions(platform=process.platform,{keyboard=false}={}){
+ return {show:false,skipTaskbar:true,focusable:keyboard,minimizable:false,maximizable:false,...(platform==='win32'?{type:'toolbar'}:{})};
+}
 const os = require('node:os');
 function supportsNativeBlur(platform=process.platform, release=os.release()) {
   return platform === 'win32' && Number(release.split('.')[2]) >= 22621;
@@ -45,4 +51,4 @@ function clipDashboard(window){
 }
 function clipPreview(window,settings){if(!window||window.isDestroyed()||typeof window.setShape!=='function')return;try{if(window.isMaximized?.()||window.isFullScreen?.())window.setShape([]);else{const {width,height}=window.getContentBounds?.()||window.getBounds();window.setShape(roundedShape({x:0,y:0,width,height,radius:dashboardRadius(settings)}));}}catch{}}
 function setupPreview(window,getTheme){const sync=()=>{clipPreview(window,getTheme());};for(const event of ['resize','maximize','unmaximize','enter-full-screen','leave-full-screen'])window.on(event,sync);sync();}
-module.exports={clipPreview,setupPreview,supportsNativeBlur,roundedShape,overlayShape,setMaterial,dashboardRadius,clipDashboard};
+module.exports={backgroundWindowOptions,clipPreview,setupPreview,supportsNativeBlur,roundedShape,overlayShape,setMaterial,dashboardRadius,clipDashboard};

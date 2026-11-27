@@ -5,7 +5,7 @@ const wait=async condition=>{for(let i=0;i<200;i++){if(condition())return;await 
 test('replay is opt-in, isolates its worker, rotates a bounded disk buffer and preserves saved clips after disabling',async()=>{
  const base=path.resolve(__dirname,'../test-results/tmp');await fs.mkdir(base,{recursive:true});const root=await fs.mkdtemp(path.join(base,'replay-')),handlers={},events={},windows=[],states=[];
  class Window extends EventEmitter{
-  constructor(){super();this.dead=false;this.messages=[];this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.send=(...args)=>this.messages.push(args);this.webContents.setWindowOpenHandler=()=>{};this.webContents.session={setPermissionCheckHandler:fn=>this.check=fn,setPermissionRequestHandler:fn=>this.permission=fn,setDisplayMediaRequestHandler:fn=>this.display=fn};windows.push(this);}
+  constructor(options){super();this.options=options;this.dead=false;this.messages=[];this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.send=(...args)=>this.messages.push(args);this.webContents.setWindowOpenHandler=()=>{};this.webContents.session={setPermissionCheckHandler:fn=>this.check=fn,setPermissionRequestHandler:fn=>this.permission=fn,setDisplayMediaRequestHandler:fn=>this.display=fn};windows.push(this);}
   isDestroyed(){return this.dead;}loadFile(){return Promise.resolve();}destroy(){this.dead=true;this.emit('closed');}
  }
  const e={app:{getPath:()=>root},BrowserWindow:Window,desktopCapturer:{getSources:async()=>[{id:'screen:one',display_id:'1',name:'Screen'}]},screen:{getPrimaryDisplay:()=>({id:1})},ipcMain:{handle:(name,fn)=>handlers[name]=fn,on:(name,fn)=>events[name]=fn}};
@@ -13,7 +13,7 @@ test('replay is opt-in, isolates its worker, rotates a bounded disk buffer and p
  const replay=new ReplayController(e,root,store,state=>states.push(state),()=>{},{verifyEncoder:async()=>{},exportMP4:async(entry,settings,progress)=>{progress(20);await gate;const output=entry.file.replace(/\.webm$/,'.mp4');await fs.writeFile(output,Buffer.alloc(64));return output;}});
  try{
   await replay.configure(store.settings);assert.equal(windows.length,0);assert.equal(replay.state.status,'off');
-  await replay.configure({...store.settings,replayEnabled:true,systemAudio:false,replaySystemAudio:true,microphone:false,replayMicrophone:true,replayAudioBitrate:320});assert.equal(windows.length,1);const w=replay.window,event={sender:w.webContents};
+  await replay.configure({...store.settings,replayEnabled:true,systemAudio:false,replaySystemAudio:true,microphone:false,replayMicrophone:true,replayAudioBitrate:320});assert.equal(windows.length,1);const w=replay.window,event={sender:w.webContents};assert.equal(w.options.show,false);assert.equal(w.options.skipTaskbar,true);assert.equal(w.options.focusable,false);assert.equal(w.options.type,process.platform==='win32'?'toolbar':undefined);
   assert.throws(()=>handlers['replay-worker:init']({sender:{}}));const config=handlers['replay-worker:init'](event);assert.equal(config.microphone,true);assert.equal(config.systemAudio,true);assert.equal(config.audioBitrate,320);let display;w.display({frame:w.webContents.mainFrame},value=>display=value);assert.equal(display.audio,'loopback');await assert.rejects(handlers['replay-worker:chunk']({sender:{}},new Uint8Array([1])));
   await handlers['replay-worker:format'](event,{mimeType:'video/webm;codecs=h264,opus'});
   events['replay-worker:state'](event,{status:'recording',codec:'h264'});

@@ -16,7 +16,7 @@ test('capture controller validates the worker, selects the primary display, flus
  try{
   await assert.rejects(c.save({folder:'relative'}));await c.save({folder:path.join(root,'saved'),height:1440,fps:120});
   assert.equal((await c.sources()).some(x=>x.id==='window:own'),false);await c.start();const window=c.window,event={sender:window.webContents};
-  assert.equal(c.source.id,'screen:primary');assert.equal(c.snapshot().active,true);assert.equal(protection.at(-1).height,1440);
+  assert.equal(window.options.show,false);assert.equal(window.options.skipTaskbar,true);assert.equal(window.options.focusable,false);assert.equal(window.options.type,process.platform==='win32'?'toolbar':undefined);assert.equal(c.source.id,'screen:primary');assert.equal(c.snapshot().active,true);assert.equal(protection.at(-1).height,1440);
   assert.throws(()=>handlers['capture-worker:init']({sender:{}}));assert.equal(handlers['capture-worker:init'](event).sourceId,'screen:primary');
   await assert.rejects(handlers['capture-worker:chunk']({sender:{}},new Uint8Array([1])));
   let allowed;window.display({frame:{}},value=>allowed=value);assert.equal(allowed,null);window.display({frame:window.webContents.mainFrame},value=>allowed=value);assert.equal(allowed.video.id,'screen:primary');assert.equal(allowed.audio,'loopback');assert.equal(window.check({},'media'),false);assert.equal(window.check(window.webContents,'media'),true);

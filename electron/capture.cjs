@@ -1,4 +1,4 @@
-const {setupPreview,clipPreview}=require('./window-style.cjs');
+const {backgroundWindowOptions,setupPreview,clipPreview}=require('./window-style.cjs');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const {CaptureStore}=require('./capture-store.cjs');
@@ -53,7 +53,7 @@ class CaptureController{
    this.current=await this.store.create();this.current.config={...this.store.settings,sourceId:source.id};this.writes=Promise.resolve();this.source=source;
    this.state={...this.state,name:path.basename(this.current.file),source:source.name};
    this.onProtection(this.current.config);
-   const window=new this.e.BrowserWindow({width:360,height:180,show:false,skipTaskbar:true,title:'EclipseIsland — запись',webPreferences:{preload:path.join(__dirname,'capture-preload.cjs'),partition:'eclipse-recorder',contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
+   const window=new this.e.BrowserWindow({...backgroundWindowOptions(process.platform),width:360,height:180,title:'EclipseIsland — запись',webPreferences:{preload:path.join(__dirname,'capture-preload.cjs'),partition:'eclipse-recorder',contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
    this.window=window;
    window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());
    const allowed=contents=>this.window===window&&!!this.current&&!window.isDestroyed()&&contents===window.webContents;

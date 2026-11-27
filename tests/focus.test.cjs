@@ -44,7 +44,7 @@ test('island is nonactivating and media updates do not focus or show game-overla
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(startedServices,['capture','replay','transfers'],'Windows services are isolated while their startup branch is exercised');
   assert.equal(flags.has('disable-background-timer-throttling'),false);assert.equal(flags.has('disable-renderer-backgrounding'),false);assert.equal(flags.get('disable-features'),'ExistingFeature');
-  let overlay=windows.find(w=>w.options.skipTaskbar);assert.ok(overlay);assert.equal(overlay.options.focusable,false);assert.equal(overlay.options.webPreferences.focusOnNavigation,false);
+  let overlay=windows.find(w=>w.options.skipTaskbar);assert.ok(overlay);assert.equal(overlay.options.focusable,false);assert.equal(overlay.options.type,'toolbar');assert.equal(overlay.options.webPreferences.focusOnNavigation,false);
   overlay.emit('ready-to-show');assert.equal(overlay.focusable,false);const shows=overlay.shows;
   update({available:true,active:true,title:'Track',playing:true});assert.equal(overlay.shows,shows);assert.equal(overlay.focuses,0);
   assert.equal(path.basename(overlay.file),'overlay.html');assert.equal(overlay.options.webPreferences.backgroundThrottling,false);
@@ -53,13 +53,13 @@ test('island is nonactivating and media updates do not focus or show game-overla
   const hide=accelerators.get('CommandOrControl+Alt+I');assert.equal(typeof hide,'function');hide();assert.equal(overlay.visible,true,'hide animation starts before native Hide');await new Promise(resolve=>setTimeout(resolve,230));assert.equal(overlay.visible,true,'native HWND stays alive');assert.equal(overlay.opacity,0);assert.equal(overlay.ignored,true);
   const original=overlay;hide();assert.equal(original.destroyed,true,'return replaces the native input surface');overlay=windows.at(-1);assert.notEqual(overlay,original);overlay.emit('ready-to-show');assert.equal(overlay.visible,true);assert.equal(overlay.ignored,false);assert.ok(overlay.shapes.length>0);assert.equal(overlay.focuses,0);
   // Repeated hotkey cycles cannot leave old timers or a stale ready callback in charge.
-  for(let i=0;i<4;i++){const old=overlay;hide();hide();overlay=windows.at(-1);assert.equal(old.destroyed,true);assert.notEqual(overlay,old);old.emit('ready-to-show');overlay.emit('ready-to-show');assert.equal(overlay.visible,true);assert.equal(overlay.ignored,false);assert.equal(overlay.focuses,0);}
+  for(let i=0;i<4;i++){const old=overlay;hide();hide();overlay=windows.at(-1);assert.equal(old.destroyed,true);assert.notEqual(overlay,old);old.emit('ready-to-show');overlay.emit('ready-to-show');assert.equal(overlay.visible,true);assert.equal(overlay.ignored,false);assert.equal(overlay.focuses,0);assert.equal(overlay.options.type,'toolbar');}
   // Hide while the fresh window is still loading, then show again.
   hide();hide();const loading=windows.at(-1);hide();loading.emit('ready-to-show');assert.equal(loading.opacity,0);hide();overlay=windows.at(-1);assert.equal(loading.destroyed,true);overlay.emit('ready-to-show');assert.equal(overlay.ignored,false);assert.equal(overlay.opacity,1);
 
   const dashboard=windows.find(w=>!w.options.skipTaskbar);assert.equal(dashboard.messages.some(m=>m.type==='media'),false,'hidden settings receive no media ticks');
   dashboard.webContents.emit('dom-ready');assert.equal(dashboard.visible,true,'HTML loader is shown without waiting for media or ready-to-show');
-  assert.equal(dashboard.options.webPreferences.backgroundThrottling,true);
+  assert.equal(dashboard.options.webPreferences.backgroundThrottling,true);assert.equal(dashboard.options.type,undefined);assert.equal(dashboard.options.skipTaskbar,undefined);
   assert.match(dashboard.icon,/eclipse\.ico$/);assert.equal(dashboard.appDetails.appId,'app.eclipseisland.desktop');assert.equal(dashboard.appDetails.appIconPath,dashboard.icon);
   dashboard.visible=false;dashboard.emit('minimize');
   update({available:true,active:true,trackKey:'restored-track',title:'Changed while minimized',playing:true});

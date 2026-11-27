@@ -32,3 +32,10 @@ test('dashboard leaves the CSS alpha edge intact without a binary native mask',(
   assert.equal(clipDashboard(win),true);assert.deepEqual(shape,[]);
   assert.equal(clipDashboard({...win,setShape(){throw Error('unsupported');}}),false);
 });
+
+
+test('Windows utility surfaces use native toolbar classification without disabling selector keyboard input',()=>{
+ const {backgroundWindowOptions}=require('../electron/window-style.cjs');
+ for(const keyboard of [false,true]){const v=backgroundWindowOptions('win32',{keyboard});assert.equal(v.type,'toolbar');assert.equal(v.skipTaskbar,true);assert.equal(v.show,false);assert.equal(v.focusable,keyboard);assert.equal(v.minimizable,false);assert.equal(v.maximizable,false);}
+ assert.equal(backgroundWindowOptions('linux').type,undefined);assert.equal(backgroundWindowOptions('darwin').type,undefined);
+});

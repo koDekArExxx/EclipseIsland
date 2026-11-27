@@ -1,3 +1,4 @@
+const {backgroundWindowOptions}=require('./window-style.cjs');
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const {CaptureStore}=require('./capture-store.cjs');
 const {exportMP4,verifyEncoder}=require('./mp4-export.cjs');
@@ -31,7 +32,7 @@ class ReplayController{
   if(!source)throw Error('Выберите доступный экран для повтора');
   this.config={...replayConfig(settings),sourceId:source.id};
   this.current=await this.store.create();this.onProtection(this.config);
-  const window=new this.e.BrowserWindow({width:32,height:32,show:false,skipTaskbar:true,webPreferences:{preload:path.join(__dirname,'capture-preload.cjs'),additionalArguments:['--eclipse-replay'],partition:'eclipse-replay',contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});this.window=window;
+  const window=new this.e.BrowserWindow({...backgroundWindowOptions(process.platform),width:32,height:32,webPreferences:{preload:path.join(__dirname,'capture-preload.cjs'),additionalArguments:['--eclipse-replay'],partition:'eclipse-replay',contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});this.window=window;
   const allowed=contents=>this.window===window&&contents===window.webContents;
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.session.setPermissionCheckHandler((contents,type)=>allowed(contents)&&['media','display-capture'].includes(type));window.webContents.session.setPermissionRequestHandler((contents,type,callback)=>callback(allowed(contents)&&['media','display-capture'].includes(type)));

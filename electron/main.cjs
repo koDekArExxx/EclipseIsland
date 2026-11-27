@@ -31,7 +31,7 @@ const { SpotifySetup } = require('./spotify-setup.cjs');
 const { MediaDelivery } = require('./media-delivery.cjs');
 const delivery=new MediaDelivery();
 // Only the island and recorder opt out of background throttling. Hidden settings sleep.
-const { clipDashboard, overlayShape } = require('./window-style.cjs');
+const { backgroundWindowOptions, clipDashboard, overlayShape } = require('./window-style.cjs');
 const nativeBlur = false; // Use one CSS compositor; mixing DWM Acrylic and backdrop-filter caused flashes.
 app.setName('EclipseIsland');
 const preferencesDirectory=path.join(app.getPath('appData'),'EclipseIsland');
@@ -138,7 +138,7 @@ function createDashboard() {
   dashboard.on('close',event=>{if(!quitting){event.preventDefault();dashboard.hide();}});
 }
 function createOverlay() {
-  overlay=new BrowserWindow({width:600,height:760,frame:false,transparent:true,resizable:false,hasShadow:false,skipTaskbar:true,focusable:false,alwaysOnTop:true,show:false,title:'EclipseIsland',backgroundColor:'#00000000',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,focusOnNavigation:false,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
+  overlay=new BrowserWindow({...backgroundWindowOptions(process.platform),width:600,height:760,frame:false,transparent:true,resizable:false,hasShadow:false,skipTaskbar:true,focusable:false,alwaysOnTop:true,show:false,title:'EclipseIsland',backgroundColor:'#00000000',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,focusOnNavigation:false,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});
   overlayVisibility=new OverlayVisibility(overlay,{beforeShow:()=>{ignored=false;lastShape='';clipOverlay();syncView(overlay);},afterHide:()=>{ignored=true;overlayHeartbeat=0;overlayTransferIds=[];transfers?.lease(false);}});
   configureWindow(overlay);
   clipOverlay();
